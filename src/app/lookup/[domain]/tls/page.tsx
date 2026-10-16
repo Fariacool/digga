@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { FC } from 'react';
 
 import TlsReport from '@/components/lookup/tls-report';
+import { requireApiAccess } from '@/lib/auth-server';
 import { isValidLookupDomain, normalizeDomain } from '@/lib/domain';
 import { shouldIndexLookup } from '@/lib/lookup-indexing';
 import { buildMetadata } from '@/lib/seo';
@@ -14,6 +15,7 @@ export async function generateMetadata({
 	params,
 }: PageProps<'/lookup/[domain]/tls'>): Promise<Metadata> {
 	const { domain } = await params;
+	await requireApiAccess(`/lookup/${domain}/tls`);
 	const normalized = normalizeDomain(decodeURIComponent(domain));
 	return buildMetadata({
 		title: `TLS certificate for ${normalized}`,
@@ -26,6 +28,7 @@ export async function generateMetadata({
 
 const TlsPage: FC<PageProps<'/lookup/[domain]/tls'>> = async ({ params }) => {
 	const { domain: raw } = await params;
+	await requireApiAccess(`/lookup/${raw}/tls`);
 	const domain = normalizeDomain(decodeURIComponent(raw));
 	if (!isValidLookupDomain(domain)) notFound();
 

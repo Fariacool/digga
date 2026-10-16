@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import type { FC } from 'react';
 
 import DnsExplorer from '@/components/lookup/dns-explorer';
+import { requireApiAccess } from '@/lib/auth-server';
 import { resolveAllRecords } from '@/lib/dns/doh';
 import { getTLD, isValidLookupDomain, normalizeDomain } from '@/lib/domain';
 import { shouldIndexLookup } from '@/lib/lookup-indexing';
@@ -14,6 +15,7 @@ export async function generateMetadata({
 	params,
 }: PageProps<'/lookup/[domain]/dns'>): Promise<Metadata> {
 	const { domain } = await params;
+	await requireApiAccess(`/lookup/${domain}/dns`);
 	const normalized = normalizeDomain(decodeURIComponent(domain));
 	return buildMetadata({
 		title: `DNS records for ${normalized}`,
@@ -26,6 +28,7 @@ export async function generateMetadata({
 
 const DnsPage: FC<PageProps<'/lookup/[domain]/dns'>> = async ({ params }) => {
 	const { domain: raw } = await params;
+	await requireApiAccess(`/lookup/${raw}/dns`);
 	const domain = normalizeDomain(decodeURIComponent(raw));
 	if (!isValidLookupDomain(domain)) notFound();
 

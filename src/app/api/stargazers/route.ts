@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 
+import { withPrivateAuthHeaders } from '@/lib/auth-core';
+import { apiAccessError } from '@/lib/auth-server';
+
 const REPO = 'maaaathis/digga';
 const RECENT_COUNT = 4;
 const PER_PAGE = 100;
@@ -12,6 +15,11 @@ export type StargazersSummary = { totalStars: number; recentStargazers: Stargaze
 type RawStargazer = { user?: { login?: string; avatar_url?: string } };
 
 const EMPTY: StargazersSummary = { totalStars: 0, recentStargazers: [] };
+
+function jsonSummary(value: StargazersSummary) {
+	const response = NextResponse.json(value);
+	return process.env.API_KEY ? withPrivateAuthHeaders(response) : response;
+}
 
 function githubHeaders(accept: string): HeadersInit {
 	const headers: Record<string, string> = {
@@ -34,16 +42,18 @@ async function fetchStargazerPage(page: number): Promise<RawStargazer[]> {
 }
 
 export async function GET() {
+	const denied = await apiAccessError();
+	if (denied) return denied;
 	try {
 		const repoRes = await fetch(`https://api.github.com/repos/${REPO}`, {
 			headers: githubHeaders('application/vnd.github+json'),
 			next: { revalidate },
 		});
-		if (!repoRes.ok) return NextResponse.json(EMPTY);
+		if (!repoRes.ok) return jsonSummary(EMPTY);
 
 		const repo = (await repoRes.json()) as { stargazers_count?: number };
 		const totalStars = repo.stargazers_count ?? 0;
-		if (totalStars === 0) return NextResponse.json(EMPTY);
+		if (totalStars === 0) return jsonSummary(EMPTY);
 
 		const lastPage = Math.max(1, Math.ceil(totalStars / PER_PAGE));
 		let items = await fetchStargazerPage(lastPage);
@@ -58,8 +68,8 @@ export async function GET() {
 			.map(entry => ({ name: entry.user?.login ?? '', avatarUrl: entry.user?.avatar_url ?? '' }))
 			.filter(stargazer => stargazer.name && stargazer.avatarUrl);
 
-		return NextResponse.json({ totalStars, recentStargazers } satisfies StargazersSummary);
+		return jsonSummary({ totalStars, recentStargazers });
 	} catch {
-		return NextResponse.json(EMPTY);
+		return jsonSummary(EMPTY);
 	}
 }

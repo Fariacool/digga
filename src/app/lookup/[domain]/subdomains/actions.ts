@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 
+import { requireApiAccess } from '@/lib/auth-server';
 import { inspectUserAgent } from '@/lib/bot';
 import { isValidLookupDomain, normalizeDomain } from '@/lib/domain';
 import { consumeToken, ipFromHeaders, sweepBuckets } from '@/lib/rate-limit';
@@ -22,6 +23,7 @@ export async function scanSubdomains(
 	input: string,
 	captchaToken?: string | null,
 ): Promise<SubdomainScanResult> {
+	await requireApiAccess(`/lookup/${encodeURIComponent(input)}/subdomains`);
 	const headerStore = await headers();
 	const userAgent = headerStore.get('user-agent');
 	const inspection = inspectUserAgent(userAgent);

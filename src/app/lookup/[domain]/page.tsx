@@ -16,6 +16,7 @@ import {
 	StatusWidget,
 } from '@/components/lookup/registration-widgets';
 import TakeoverBanner from '@/components/lookup/takeover-banner';
+import { requireApiAccess } from '@/lib/auth-server';
 import { logDomainLookup } from '@/lib/bigquery';
 import { resolveRecordType } from '@/lib/dns/doh';
 import {
@@ -44,6 +45,7 @@ type Props = PageProps<'/lookup/[domain]'>;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const { domain } = await params;
+	await requireApiAccess(`/lookup/${domain}`);
 	const normalized = normalizeDomain(decodeURIComponent(domain));
 	if (!isIndexableLookupDomain(normalized)) {
 		return buildMetadata({ title: 'Lookup', path: `/lookup/${domain}`, noIndex: true });
@@ -105,6 +107,7 @@ function findEventDate(
 
 const OverviewPage: FC<Props> = async ({ params }) => {
 	const { domain: raw } = await params;
+	await requireApiAccess(`/lookup/${raw}`);
 	const domain = normalizeDomain(decodeURIComponent(raw));
 	if (!isValidLookupDomain(domain)) notFound();
 

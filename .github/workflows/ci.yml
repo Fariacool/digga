@@ -32,5 +32,11 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test authentication primitives
+        run: pnpm test
+
       - name: Run build
         run: pnpm run build
+
+      - name: Test authentication HTTP behavior
+        run: node --experimental-strip-types --test tests/auth-http.test.ts

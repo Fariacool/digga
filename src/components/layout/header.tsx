@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { FC } from 'react';
 
+import ApiKeyControl from '@/components/auth/api-key-control';
 import GithubIcon from '@/components/brand/github-icon';
 import LogoMark from '@/components/brand/logo';
 import ThemeToggle from '@/components/theme/theme-toggle';
@@ -18,6 +19,7 @@ const Header: FC = () => (
 				<span className="sr-only">digga</span>
 			</Link>
 			<div className="flex items-center gap-1">
+				<ApiKeyControl />
 				<Button asChild variant="ghost" size="sm">
 					<Link
 						href="https://github.com/maaaathis/digga"

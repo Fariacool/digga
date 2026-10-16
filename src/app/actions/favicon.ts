@@ -1,5 +1,6 @@
 'use server';
 
+import { requireApiAccess } from '@/lib/auth-server';
 import { isValidLookupDomain, normalizeDomain } from '@/lib/domain';
 
 const PLACEHOLDER_HASH = 'e5db88ea2322863ca17817b99d60006c625a31cff0dad49cf05d3c6d16a75c17';
@@ -14,6 +15,7 @@ async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
 }
 
 export async function hasFavicon(input: string): Promise<boolean> {
+	await requireApiAccess();
 	const domain = normalizeDomain(input);
 	if (!isValidLookupDomain(domain)) return false;
 

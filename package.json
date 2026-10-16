@@ -10,6 +10,8 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",
+		"test": "node --experimental-strip-types --test tests/auth-core.test.ts",
+		"test:auth": "pnpm test && pnpm build && node --experimental-strip-types --test tests/auth-http.test.ts",
 		"test:format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss}\"",
 		"format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,scss}\"",
 		"bigquery:setup": "node --env-file=.env --experimental-strip-types scripts/setup-bigquery.ts",

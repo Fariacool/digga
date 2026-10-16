@@ -10,6 +10,7 @@ import RegistrationRecord, {
 } from '@/components/lookup/registration-record';
 import StateNotice from '@/components/lookup/state-notice';
 import WhoisTabs from '@/components/lookup/whois-tabs';
+import { requireApiAccess } from '@/lib/auth-server';
 import { getBaseDomain, getTLD, isValidLookupDomain, normalizeDomain } from '@/lib/domain';
 import { lookupRdap } from '@/lib/rdap/client';
 import type { NormalizedRdap } from '@/lib/rdap/types';
@@ -25,6 +26,7 @@ export async function generateMetadata({
 	params,
 }: PageProps<'/lookup/[domain]/whois'>): Promise<Metadata> {
 	const { domain } = await params;
+	await requireApiAccess(`/lookup/${domain}/whois`);
 	const normalized = normalizeDomain(decodeURIComponent(domain));
 	return buildMetadata({
 		title: `RDAP and WHOIS for ${normalized}`,
@@ -76,6 +78,7 @@ async function load(domain: string): Promise<Loaded> {
 
 const WhoisPage: FC<PageProps<'/lookup/[domain]/whois'>> = async ({ params }) => {
 	const { domain: raw } = await params;
+	await requireApiAccess(`/lookup/${raw}/whois`);
 	const domain = normalizeDomain(decodeURIComponent(raw));
 	if (!isValidLookupDomain(domain)) notFound();
 

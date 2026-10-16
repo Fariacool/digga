@@ -2,6 +2,7 @@
 
 import { headers } from 'next/headers';
 
+import { requireApiAccess } from '@/lib/auth-server';
 import { inspectUserAgent } from '@/lib/bot';
 import { getIpDetails, type IpDetails } from '@/lib/ip';
 import { consumeToken, ipFromHeaders, sweepBuckets } from '@/lib/rate-limit';
@@ -17,6 +18,7 @@ export type IpDetailsResult =
 	| { kind: 'error'; message: string };
 
 export async function fetchIpDetails(ip: string): Promise<IpDetailsResult> {
+	await requireApiAccess();
 	if (!ip || (!IPV4.test(ip) && !IPV6.test(ip))) {
 		return { kind: 'invalid' };
 	}
