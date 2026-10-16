@@ -1,4 +1,7 @@
 allowBuilds:
+  '@scarf/scarf': false
   msw: false
   sharp: false
   unrs-resolver: false
+minimumReleaseAgeExclude:
+  - swagger-ui-dist@5.33.3

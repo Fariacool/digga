@@ -1,0 +1,105 @@
+.api-reference .swagger-ui {
+	font-family: var(--font-geist-sans), sans-serif;
+	color: var(--foreground);
+}
+
+.api-reference .swagger-ui .wrapper {
+	padding: 0;
+}
+
+.api-reference .swagger-ui .info {
+	margin: 0 0 24px;
+}
+
+.api-reference .swagger-ui .info .title {
+	font-size: 22px;
+}
+
+.api-reference .swagger-ui .info .title,
+.api-reference .swagger-ui .info p,
+.api-reference .swagger-ui .info li,
+.api-reference .swagger-ui .info hgroup,
+.api-reference .swagger-ui .opblock-tag,
+.api-reference .swagger-ui .opblock-summary-path,
+.api-reference .swagger-ui .opblock-summary-description,
+.api-reference .swagger-ui .parameter__name,
+.api-reference .swagger-ui .parameter__type,
+.api-reference .swagger-ui .parameter__in,
+.api-reference .swagger-ui .response-col_status,
+.api-reference .swagger-ui .response-col_links,
+.api-reference .swagger-ui .responses-inner h4,
+.api-reference .swagger-ui .responses-inner h5,
+.api-reference .swagger-ui .tab li,
+.api-reference .swagger-ui .model-title,
+.api-reference .swagger-ui label,
+.api-reference .swagger-ui table thead tr th,
+.api-reference .swagger-ui .markdown p,
+.api-reference .swagger-ui .markdown li,
+.api-reference .swagger-ui .renderedMarkdown p,
+.api-reference .swagger-ui .renderedMarkdown li {
+	color: var(--foreground);
+}
+
+.api-reference .swagger-ui .scheme-container,
+.api-reference .swagger-ui .opblock-section-header {
+	background: var(--background);
+	box-shadow: none;
+}
+
+.api-reference .swagger-ui .scheme-container {
+	padding: 16px 0;
+	border-block: 1px solid var(--border);
+}
+
+.api-reference .swagger-ui .opblock {
+	border-radius: 12px;
+	box-shadow: none;
+}
+
+.api-reference .swagger-ui input,
+.api-reference .swagger-ui textarea,
+.api-reference .swagger-ui select,
+.api-reference .swagger-ui .dialog-ux .modal-ux {
+	background: var(--background);
+	color: var(--foreground);
+}
+
+.api-reference .swagger-ui .dialog-ux .modal-ux-header h3,
+.api-reference .swagger-ui .dialog-ux .modal-ux-content h4,
+.api-reference .swagger-ui .dialog-ux .modal-ux-content p,
+.api-reference .swagger-ui .dialog-ux .modal-ux-content code {
+	color: var(--foreground);
+}
+
+.api-reference .swagger-ui .btn {
+	color: var(--foreground);
+	border-color: var(--border);
+}
+
+.api-reference .swagger-ui .btn.authorize {
+	color: var(--foreground);
+	border-color: var(--foreground);
+}
+
+.dark .api-reference .swagger-ui svg {
+	fill: var(--foreground);
+}
+
+.api-reference .swagger-ui .opblock-summary {
+	flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+	.api-reference .swagger-ui .opblock-summary-path {
+		font-size: 13px;
+	}
+
+	.api-reference .swagger-ui .opblock-summary-description {
+		flex-basis: 100%;
+		padding: 8px 0 0;
+	}
+
+	.api-reference .swagger-ui .opblock-body {
+		overflow-x: auto;
+	}
+}

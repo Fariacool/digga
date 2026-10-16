@@ -7,6 +7,7 @@ import {
 	unlockPath,
 	withPrivateAuthHeaders,
 } from '@/lib/auth-core';
+import { whoisUnauthorized } from '@/lib/whois-api/http';
 
 export function proxy(request: NextRequest) {
 	if (!process.env.API_KEY || request.nextUrl.pathname === '/api/auth') {
@@ -39,7 +40,10 @@ export function proxy(request: NextRequest) {
 			const target = unlockPath(`${request.nextUrl.pathname}${request.nextUrl.search}`);
 			return withPrivateAuthHeaders(NextResponse.redirect(new URL(target, request.url)));
 		}
-		return unauthorizedResponse();
+		return request.nextUrl.pathname === '/api/whois' ||
+			request.nextUrl.pathname === '/api/whois/batch'
+			? whoisUnauthorized()
+			: unauthorizedResponse();
 	}
 
 	return withPrivateAuthHeaders(NextResponse.next());

@@ -19,6 +19,9 @@ const Header: FC = () => (
 				<span className="sr-only">digga</span>
 			</Link>
 			<div className="flex items-center gap-1">
+				<Button asChild variant="ghost" size="sm">
+					<Link href="/docs">API</Link>
+				</Button>
 				<ApiKeyControl />
 				<Button asChild variant="ghost" size="sm">
 					<Link
