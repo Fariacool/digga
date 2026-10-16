@@ -23,26 +23,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM dependencies AS builder
 COPY . .
 
-# Only public configuration belongs in build arguments. Secrets are runtime env.
-ARG SITE_URL=http://localhost:3000
-ARG NEXT_PUBLIC_ANALYTICS_SCRIPT=""
-ARG NEXT_PUBLIC_ANALYTICS_ID=""
-ARG NEXT_PUBLIC_ANALYTICS_DOMAINS=digga.dev
-ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=""
-ENV SITE_URL=${SITE_URL} \
-    NEXT_PUBLIC_ANALYTICS_SCRIPT=${NEXT_PUBLIC_ANALYTICS_SCRIPT} \
-    NEXT_PUBLIC_ANALYTICS_ID=${NEXT_PUBLIC_ANALYTICS_ID} \
-    NEXT_PUBLIC_ANALYTICS_DOMAINS=${NEXT_PUBLIC_ANALYTICS_DOMAINS} \
-    NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
 RUN pnpm test && pnpm run build
 
 FROM base AS runner
-ARG SITE_URL=http://localhost:3000
 ENV NODE_ENV=production \
     ENVIRONMENT=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000 \
-    SITE_URL=${SITE_URL} \
     HOME=/home/node
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static

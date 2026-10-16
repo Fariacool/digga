@@ -1,7 +1,7 @@
 import { SITE_DESCRIPTION } from '@/lib/data';
 import { absoluteUrl } from '@/lib/seo';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export function GET(): Response {
 	const body = `# digga.dev

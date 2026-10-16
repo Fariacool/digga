@@ -52,12 +52,6 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          build-args: |
-            SITE_URL=${{ vars.SITE_URL || 'http://localhost:3000' }}
-            NEXT_PUBLIC_ANALYTICS_SCRIPT=${{ vars.NEXT_PUBLIC_ANALYTICS_SCRIPT }}
-            NEXT_PUBLIC_ANALYTICS_ID=${{ vars.NEXT_PUBLIC_ANALYTICS_ID }}
-            NEXT_PUBLIC_ANALYTICS_DOMAINS=${{ vars.NEXT_PUBLIC_ANALYTICS_DOMAINS || 'digga.dev' }}
-            NEXT_PUBLIC_TURNSTILE_SITE_KEY=${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

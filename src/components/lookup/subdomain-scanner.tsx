@@ -14,17 +14,16 @@ import { trackEvent } from '@/lib/analytics';
 type SubdomainScannerProps = {
 	domain: string;
 	tld?: string;
+	turnstileSiteKey?: string;
 };
 
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-
-const SubdomainScanner: FC<SubdomainScannerProps> = ({ domain, tld }) => {
+const SubdomainScanner: FC<SubdomainScannerProps> = ({ domain, tld, turnstileSiteKey }) => {
 	const [result, setResult] = useState<SubdomainScanResult | null>(null);
 	const [pending, startTransition] = useTransition();
 	const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 	const [captchaReset, setCaptchaReset] = useState(0);
 
-	const captchaRequired = Boolean(TURNSTILE_SITE_KEY);
+	const captchaRequired = Boolean(turnstileSiteKey);
 
 	const onScan = () => {
 		if (captchaRequired && !captchaToken) {
@@ -83,10 +82,10 @@ const SubdomainScanner: FC<SubdomainScannerProps> = ({ domain, tld }) => {
 					</Button>
 				</div>
 				<SubdomainResults domain={domain} subdomains={result.subdomains} tookMs={result.tookMs} />
-				{captchaRequired && TURNSTILE_SITE_KEY ? (
+				{turnstileSiteKey ? (
 					<div className="hidden">
 						<TurnstileWidget
-							siteKey={TURNSTILE_SITE_KEY}
+							siteKey={turnstileSiteKey}
 							onVerify={setCaptchaToken}
 							onExpire={() => setCaptchaToken(null)}
 							resetSignal={captchaReset}
@@ -114,10 +113,10 @@ const SubdomainScanner: FC<SubdomainScannerProps> = ({ domain, tld }) => {
 				Run scan
 			</Button>
 
-			{captchaRequired && TURNSTILE_SITE_KEY ? (
+			{turnstileSiteKey ? (
 				<div className="flex flex-col items-center gap-2">
 					<TurnstileWidget
-						siteKey={TURNSTILE_SITE_KEY}
+						siteKey={turnstileSiteKey}
 						onVerify={setCaptchaToken}
 						onExpire={() => setCaptchaToken(null)}
 						resetSignal={captchaReset}

@@ -1,7 +1,7 @@
 import { siteUrl } from '@/lib/seo';
 import { renderSitemapIndex, XML_RESPONSE_HEADERS } from '@/lib/sitemap';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export function GET() {
 	const base = siteUrl();

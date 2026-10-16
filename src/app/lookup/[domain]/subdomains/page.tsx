@@ -5,6 +5,7 @@ import type { FC } from 'react';
 import SubdomainScanner from '@/components/lookup/subdomain-scanner';
 import { requireApiAccess } from '@/lib/auth-server';
 import { getTLD, isValidLookupDomain, normalizeDomain } from '@/lib/domain';
+import { getRuntimeEnv } from '@/lib/runtime-env';
 import { buildMetadata } from '@/lib/seo';
 
 export async function generateMetadata({
@@ -28,7 +29,14 @@ const SubdomainsPage: FC<PageProps<'/lookup/[domain]/subdomains'>> = async ({ pa
 	const domain = normalizeDomain(decodeURIComponent(raw));
 	if (!isValidLookupDomain(domain)) notFound();
 
-	return <SubdomainScanner domain={domain} tld={getTLD(domain) ?? undefined} />;
+	// Pass only the public runtime key to the client; the secret stays server-side.
+	return (
+		<SubdomainScanner
+			domain={domain}
+			tld={getTLD(domain) ?? undefined}
+			turnstileSiteKey={getRuntimeEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY') || undefined}
+		/>
+	);
 };
 
 export default SubdomainsPage;

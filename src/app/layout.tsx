@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono, Space_Grotesk } from 'next/font/google';
+import { connection } from 'next/server';
 import type { ReactNode } from 'react';
 
 import Analytics from '@/components/analytics';
@@ -64,7 +65,10 @@ export const viewport: Viewport = {
 	],
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+	// Read deployment configuration when serving a request, not during the build.
+	await connection();
+
 	return (
 		<html
 			lang="en"

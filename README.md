@@ -46,7 +46,9 @@ browser after rotating it. Serve the instance over HTTPS outside local
 development.
 
 Run `pnpm test` for authentication unit tests, or `pnpm test:auth` to also build
-the app and check protected and public modes against production servers.
+the app and check protected/public modes and runtime deployment settings against
+production servers. After a build, `pnpm test:http` reruns the HTTP checks using
+the same build with different runtime configurations.
 
 ## Docker and GHCR deployment
 
@@ -62,29 +64,30 @@ The image uses Node.js 24 and Next.js standalone output, runs as the non-root
 `node` user, and includes the checksum-verified `subfinder` binary. A failed
 subfinder installation or authentication unit test stops the image build.
 
-### Build configuration
+### Runtime configuration
 
-Set **Settings → Secrets and variables → Actions → Variables** as needed:
+Build the image without application configuration. Set all deployment values in
+the server's `.env`; no GitHub Actions application variables are needed. The
+same image can run with different settings on different servers.
 
-| Repository variable              | Purpose                                                              | Default                 |
-| -------------------------------- | -------------------------------------------------------------------- | ----------------------- |
-| `SITE_URL`                       | Public origin used in prerendered metadata, robots.txt, and sitemaps | `http://localhost:3000` |
-| `NEXT_PUBLIC_ANALYTICS_SCRIPT`   | Optional analytics script URL                                        | Empty                   |
-| `NEXT_PUBLIC_ANALYTICS_ID`       | Optional analytics website ID                                        | Empty                   |
-| `NEXT_PUBLIC_ANALYTICS_DOMAINS`  | Analytics domain filter                                              | `digga.dev`             |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional Turnstile public site key                                   | Empty                   |
+| Environment variable             | Purpose                                                                     | Default                    |
+| -------------------------------- | --------------------------------------------------------------------------- | -------------------------- |
+| `SITE_URL`                       | Public origin for this instance's metadata, robots.txt, sitemaps, and links | `http://localhost:3000`    |
+| `NEXT_PUBLIC_ANALYTICS_SCRIPT`   | Optional analytics script URL                                               | Empty (analytics disabled) |
+| `NEXT_PUBLIC_ANALYTICS_ID`       | Optional analytics website ID                                               | Empty (analytics disabled) |
+| `NEXT_PUBLIC_ANALYTICS_DOMAINS`  | Optional analytics domain filter                                            | Empty (no domain filter)   |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional Turnstile public site key                                          | Empty                      |
 
-Set `SITE_URL` to your deployed origin, for example `https://digga.example.com`,
-before the first production build. Keep the server's `.env` `SITE_URL` equal to
-that build value so dynamically rendered pages use the same origin. Changes to
-these build settings require another image build; changing only the server's
-`.env` cannot update prerendered URLs or bundled `NEXT_PUBLIC_*` values.
+Set `SITE_URL` to this instance's deployed origin. Pages and deployment metadata
+read it at runtime. The existing `NEXT_PUBLIC_*` names are retained for
+compatibility; the server reads them at runtime and passes the required public
+values to the browser. Changing these values requires recreating the container,
+without rebuilding the image.
 
 Keep `API_KEY`, `TURNSTILE_SECRET`, `GOOGLE_SERVICE_KEY_B64`, and other
 credentials in the server's `.env`. Environment files are excluded from the
-Docker build context. Do not pass credentials as build arguments. If enabling
-Turnstile, configure its public site key at build time and matching
-`TURNSTILE_SECRET` at runtime.
+Docker build context. For Turnstile, configure both its public site key and
+matching `TURNSTILE_SECRET` in `.env`.
 
 ### Run with Docker Compose
 
@@ -123,9 +126,9 @@ New commits publish an image; update a running server with `./compose upgrade`.
 For a rollback, set `IMAGE_NAME` to a previous `sha-<full-commit-sha>` tag and run
 `./compose upgrade` again.
 
-To build locally with the same public settings:
+To build locally:
 
 ```bash
-docker build --build-arg SITE_URL=https://digga.example.com -t digga:local .
+docker build -t digga:local .
 IMAGE_NAME=digga:local ./compose up
 ```

@@ -54,7 +54,7 @@ Commands:
 
 Before first use:
   Run ./compose init, review .env, then run ./compose upgrade.
-  Set SITE_URL to the same public URL used to build the image.
+  Set SITE_URL to the public URL of this instance.
   API_KEY is optional; leave it empty for public access.
 
 Common overrides in .env or the shell:
@@ -65,7 +65,7 @@ Common overrides in .env or the shell:
   RESTART_POLICY         Restart policy, default unless-stopped
   LOG_MAX_SIZE/FILE      Log rotation, defaults 10m and 3
 
-SITE_URL and NEXT_PUBLIC_* build settings are documented in README.md.
+Application settings are read from .env at runtime; see README.md.
 EOF
 }
 

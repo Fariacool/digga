@@ -2,7 +2,7 @@ import { siteUrl } from '@/lib/seo';
 import { renderUrlset, type UrlEntry, XML_RESPONSE_HEADERS } from '@/lib/sitemap';
 import { TOOL_LIST } from '@/lib/tools';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export function GET() {
 	const base = siteUrl();

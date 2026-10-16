@@ -1,6 +1,6 @@
 import { siteUrl } from '@/lib/seo';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export function GET(): Response {
 	const base = siteUrl();

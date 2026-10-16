@@ -38,5 +38,5 @@ jobs:
       - name: Run build
         run: pnpm run build
 
-      - name: Test authentication HTTP behavior
-        run: node --experimental-strip-types --test tests/auth-http.test.ts
+      - name: Test production HTTP behavior
+        run: pnpm test:http
