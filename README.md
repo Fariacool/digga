@@ -150,6 +150,15 @@ workflow manually on `main` from GitHub Actions. Publishing uses the built-in
 `GITHUB_TOKEN` with `packages: write`; no `ENABLE_DOCKER_PUBLISH` variable or
 additional registry secret is required.
 
+The platforms build in parallel on native `ubuntu-24.04` (amd64) and
+`ubuntu-24.04-arm` (arm64) runners, with a separate build cache for each
+architecture. The workflow also persists the Next.js build cache between runs.
+Each image must pass a container smoke test covering its native architecture,
+subfinder, runtime authentication, HTML and static assets. After both images
+pass, their digests are combined into one multi-platform manifest and the
+published tags are updated. The workflow verifies that the published manifest
+contains both Linux architectures.
+
 The image uses Node.js 24 and Next.js standalone output, runs as the non-root
 `node` user, and includes the checksum-verified `subfinder` binary. A failed
 subfinder installation or authentication unit test stops the image build.

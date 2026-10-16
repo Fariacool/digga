@@ -23,7 +23,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM dependencies AS builder
 COPY . .
 
-RUN pnpm test && pnpm run build
+RUN --mount=type=cache,target=/app/.next/cache pnpm test && pnpm run build
 
 FROM base AS runner
 ENV NODE_ENV=production \
