@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "${SCRIPT_DIR}"
+
+compose_cmd() {
+  docker compose --project-directory "${SCRIPT_DIR}" \
+    --env-file "${SCRIPT_DIR}/.env" -f "${SCRIPT_DIR}/docker-compose.yml" "$@"
+}
+
+ensure_docker() {
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "Docker is required but was not found in PATH." >&2
+    exit 1
+  fi
+
+  if ! docker compose version >/dev/null 2>&1; then
+    echo "Docker Compose v2 is required (docker compose)." >&2
+    exit 1
+  fi
+}
+
+ensure_env() {
+  if [ ! -f .env ]; then
+    (umask 077 && cp .env.example .env)
+    echo "Created .env from .env.example. Review SITE_URL and optional API_KEY before deployment." >&2
+  fi
+}
+
+prepare() {
+  ensure_docker
+  ensure_env
+  compose_cmd config --quiet
+}
+
+show_usage() {
+  cat <<'EOF'
+Usage: ./compose {init|up|down|restart|logs|ps|pull|upgrade|redeploy|validate|help} [service]
+
+Commands:
+  init       Create .env when missing and validate the Compose configuration
+  up         Start the stack in the background
+  down       Stop and remove the stack
+  restart    Restart containers (optional: service name)
+  logs       Follow logs (default: app, or specify service)
+  ps         Show stack status
+  pull       Pull the configured image
+  upgrade    Pull the configured image and recreate changed containers
+  redeploy   Force-recreate containers using the current local image
+  validate   Validate the configuration without printing environment values
+  help       Show this help
+
+Before first use:
+  Run ./compose init, review .env, then run ./compose upgrade.
+  Set SITE_URL to the same public URL used to build the image.
+  API_KEY is optional; leave it empty for public access.
+
+Common overrides in .env or the shell:
+  IMAGE_NAME             Image/tag to run, default ghcr.io/fariacool/digga:latest
+  HOST_BIND_ADDRESS      Host interface to bind, default 0.0.0.0
+  HOST_PORT              Published HTTP port, default 3000
+  COMPOSE_PROJECT_NAME   Compose project name, defaults to the directory name
+  RESTART_POLICY         Restart policy, default unless-stopped
+  LOG_MAX_SIZE/FILE      Log rotation, defaults 10m and 3
+
+SITE_URL and NEXT_PUBLIC_* build settings are documented in README.md.
+EOF
+}
+
+case "${1:-help}" in
+  help | -h | --help)
+    show_usage
+    exit 0
+    ;;
+  init | up | down | restart | logs | ps | pull | upgrade | redeploy | validate) ;;
+  *)
+    show_usage >&2
+    exit 1
+    ;;
+esac
+
+if [ "$#" -gt 2 ] || { [ "$#" -eq 2 ] && [ "$1" != "restart" ] && [ "$1" != "logs" ]; }; then
+  show_usage >&2
+  exit 1
+fi
+
+prepare
+
+case "$1" in
+  init | validate)
+    echo "Compose configuration is valid."
+    ;;
+  up)
+    compose_cmd up -d --remove-orphans
+    ;;
+  down)
+    compose_cmd down
+    ;;
+  restart)
+    if [ -n "${2:-}" ]; then
+      compose_cmd restart "$2"
+    else
+      compose_cmd restart
+    fi
+    ;;
+  logs)
+    compose_cmd logs -f "${2:-app}"
+    ;;
+  ps)
+    compose_cmd ps
+    ;;
+  pull)
+    compose_cmd pull
+    ;;
+  upgrade)
+    compose_cmd pull
+    compose_cmd up -d --remove-orphans
+    ;;
+  redeploy)
+    compose_cmd up -d --force-recreate --remove-orphans
+    ;;
+esac

@@ -47,3 +47,85 @@ development.
 
 Run `pnpm test` for authentication unit tests, or `pnpm test:auth` to also build
 the app and check protected and public modes against production servers.
+
+## Docker and GHCR deployment
+
+Every push to `main` runs `.github/workflows/docker-build.yaml`, builds Linux
+`amd64` and `arm64` images, and publishes them to `ghcr.io/<owner>/<repository>`.
+For this repository the image is `ghcr.io/fariacool/digga`. Each successful build
+publishes `latest`, `main`, and `sha-<full-commit-sha>` tags. You can also run the
+workflow manually on `main` from GitHub Actions. Publishing uses the built-in
+`GITHUB_TOKEN` with `packages: write`; no `ENABLE_DOCKER_PUBLISH` variable or
+additional registry secret is required.
+
+The image uses Node.js 24 and Next.js standalone output, runs as the non-root
+`node` user, and includes the checksum-verified `subfinder` binary. A failed
+subfinder installation or authentication unit test stops the image build.
+
+### Build configuration
+
+Set **Settings → Secrets and variables → Actions → Variables** as needed:
+
+| Repository variable              | Purpose                                                              | Default                 |
+| -------------------------------- | -------------------------------------------------------------------- | ----------------------- |
+| `SITE_URL`                       | Public origin used in prerendered metadata, robots.txt, and sitemaps | `http://localhost:3000` |
+| `NEXT_PUBLIC_ANALYTICS_SCRIPT`   | Optional analytics script URL                                        | Empty                   |
+| `NEXT_PUBLIC_ANALYTICS_ID`       | Optional analytics website ID                                        | Empty                   |
+| `NEXT_PUBLIC_ANALYTICS_DOMAINS`  | Analytics domain filter                                              | `digga.dev`             |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional Turnstile public site key                                   | Empty                   |
+
+Set `SITE_URL` to your deployed origin, for example `https://digga.example.com`,
+before the first production build. Keep the server's `.env` `SITE_URL` equal to
+that build value so dynamically rendered pages use the same origin. Changes to
+these build settings require another image build; changing only the server's
+`.env` cannot update prerendered URLs or bundled `NEXT_PUBLIC_*` values.
+
+Keep `API_KEY`, `TURNSTILE_SECRET`, `GOOGLE_SERVICE_KEY_B64`, and other
+credentials in the server's `.env`. Environment files are excluded from the
+Docker build context. Do not pass credentials as build arguments. If enabling
+Turnstile, configure its public site key at build time and matching
+`TURNSTILE_SECRET` at runtime.
+
+### Run with Docker Compose
+
+Install Docker Engine and Docker Compose v2. Place `docker-compose.yml`,
+`.env.example`, and the executable `compose` script together on your server
+(or clone this repository), then run:
+
+```bash
+./compose init
+# Edit .env: set SITE_URL and optionally API_KEY or provider credentials.
+./compose upgrade
+./compose ps
+./compose logs
+```
+
+The default image is `ghcr.io/fariacool/digga:latest` and the default HTTP port is
+`3000`. Override `IMAGE_NAME`, `HOST_PORT`, or `HOST_BIND_ADDRESS` in `.env` as
+needed. For a reverse proxy running on the host, use
+`HOST_BIND_ADDRESS=127.0.0.1` and forward to `http://127.0.0.1:3000`.
+
+The Compose stack sets `NODE_ENV` and `ENVIRONMENT` to `production`, uses the
+public `/api/auth` status endpoint for its healthcheck, rotates logs, and
+restarts unless stopped. Core lookups do not require a database or persistent
+volume. BigQuery storage remains optional and uses runtime credentials.
+
+```bash
+./compose validate      # Check configuration without printing environment values
+./compose up            # Start using the configured image
+./compose upgrade       # Pull latest image and apply image/environment changes
+./compose redeploy      # Force recreation with the current local image and .env
+./compose restart app   # Restart app without applying changed environment values
+./compose down          # Stop and remove the stack
+```
+
+New commits publish an image; update a running server with `./compose upgrade`.
+For a rollback, set `IMAGE_NAME` to a previous `sha-<full-commit-sha>` tag and run
+`./compose upgrade` again.
+
+To build locally with the same public settings:
+
+```bash
+docker build --build-arg SITE_URL=https://digga.example.com -t digga:local .
+IMAGE_NAME=digga:local ./compose up
+```

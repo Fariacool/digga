@@ -72,7 +72,8 @@ function execSubfinder(
 
 	return new Promise<SubfinderResult>(resolve => {
 		let settled = false;
-		const child = spawn(binaryPath(), buildArgs(domain), {
+		// The executable is supplied at runtime (Dockerfile copies the bundled binary).
+		const child = spawn(/* turbopackIgnore: true */ binaryPath(), buildArgs(domain), {
 			stdio: ['ignore', 'pipe', 'pipe'],
 			detached: true,
 			// subfinder writes its config under $HOME/.config; ensure a writable

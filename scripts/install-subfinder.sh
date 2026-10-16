@@ -50,9 +50,12 @@ URL="https://github.com/projectdiscovery/subfinder/releases/download/v${VERSION}
 log "Downloading $URL"
 curl -fsSL --max-time 120 -o "$ZIP_PATH" "$URL" || bail "Download failed"
 
-ACTUAL_SHA="$(shasum -a 256 "$ZIP_PATH" 2>/dev/null | awk '{print $1}')"
-if [ -z "$ACTUAL_SHA" ]; then
+if command -v sha256sum >/dev/null 2>&1; then
   ACTUAL_SHA="$(sha256sum "$ZIP_PATH" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL_SHA="$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')"
+else
+  bail "Neither sha256sum nor shasum is available — cannot verify subfinder"
 fi
 if [ "$ACTUAL_SHA" != "$SHA" ]; then
   bail "Checksum mismatch for $ASSET: expected $SHA, got $ACTUAL_SHA"
