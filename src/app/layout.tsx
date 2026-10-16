@@ -33,30 +33,32 @@ const geistMono = Geist_Mono({
 	display: 'swap',
 });
 
-export const metadata: Metadata = {
-	metadataBase: new URL(siteUrl()),
-	title: {
-		default: `${SITE_NAME} · ${SITE_TAGLINE}`,
-		template: `%s · ${SITE_NAME}`,
-	},
-	description: SITE_DESCRIPTION,
-	applicationName: SITE_NAME,
-	keywords: [...SEO_KEYWORDS],
-	openGraph: {
-		type: 'website',
-		siteName: SITE_NAME,
-		title: `${SITE_NAME} · ${SITE_TAGLINE}`,
+export async function generateMetadata(): Promise<Metadata> {
+	return {
+		metadataBase: new URL(await siteUrl()),
+		title: {
+			default: `${SITE_NAME} · ${SITE_TAGLINE}`,
+			template: `%s · ${SITE_NAME}`,
+		},
 		description: SITE_DESCRIPTION,
-		url: '/',
-	},
-	twitter: {
-		card: 'summary_large_image',
-		title: `${SITE_NAME} · ${SITE_TAGLINE}`,
-		description: SITE_DESCRIPTION,
-	},
-	alternates: { canonical: '/' },
-	robots: 'index, follow',
-};
+		applicationName: SITE_NAME,
+		keywords: [...SEO_KEYWORDS],
+		openGraph: {
+			type: 'website',
+			siteName: SITE_NAME,
+			title: `${SITE_NAME} · ${SITE_TAGLINE}`,
+			description: SITE_DESCRIPTION,
+			url: '/',
+		},
+		twitter: {
+			card: 'summary_large_image',
+			title: `${SITE_NAME} · ${SITE_TAGLINE}`,
+			description: SITE_DESCRIPTION,
+		},
+		alternates: { canonical: '/' },
+		robots: 'index, follow',
+	};
+}
 
 export const viewport: Viewport = {
 	themeColor: [

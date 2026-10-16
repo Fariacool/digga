@@ -1,19 +1,24 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 
 import { SEO_KEYWORDS, SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE } from '@/lib/data';
+import { resolveSiteOrigin } from '@/lib/site-origin';
 import { TOOLS, type ToolSlug } from '@/lib/tools';
 
-export function siteUrl(): string {
-	return process.env.SITE_URL ?? 'http://localhost:3000';
+export async function siteUrl(): Promise<string> {
+	const configuredUrl = process.env.SITE_URL?.trim();
+	// Explicit overrides also work outside a request, such as background jobs.
+	if (configuredUrl) return resolveSiteOrigin(new Headers(), configuredUrl);
+	return resolveSiteOrigin(await headers());
 }
 
-export function absoluteUrl(path: string): string {
-	const base = siteUrl();
+export async function absoluteUrl(path: string): Promise<string> {
 	if (path.startsWith('http')) return path;
+	const base = await siteUrl();
 	return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
-export function buildMetadata({
+export async function buildMetadata({
 	title,
 	description = SITE_DESCRIPTION,
 	path,
@@ -27,8 +32,9 @@ export function buildMetadata({
 	keywords?: readonly string[];
 	noIndex?: boolean;
 	image?: string;
-}): Metadata {
-	const url = absoluteUrl(path);
+}): Promise<Metadata> {
+	const url = await absoluteUrl(path);
+	const imageUrl = image ? await absoluteUrl(image) : undefined;
 	return {
 		title,
 		description,
@@ -40,26 +46,26 @@ export function buildMetadata({
 			description,
 			url,
 			siteName: SITE_NAME,
-			...(image ? { images: absoluteUrl(image) } : {}),
+			...(imageUrl ? { images: imageUrl } : {}),
 		},
 		twitter: {
 			card: 'summary_large_image',
 			title,
 			description,
-			...(image ? { images: absoluteUrl(image) } : {}),
+			...(imageUrl ? { images: imageUrl } : {}),
 		},
 		robots: noIndex ? 'noindex, nofollow' : 'index, follow',
 	};
 }
 
-export function rootMetadata(): Metadata {
+export function rootMetadata(): Promise<Metadata> {
 	return buildMetadata({
 		title: `${SITE_NAME} · ${SITE_TAGLINE}`,
 		path: '/',
 	});
 }
 
-export function toolMetadata(slug: ToolSlug): Metadata {
+export function toolMetadata(slug: ToolSlug): Promise<Metadata> {
 	const tool = TOOLS[slug];
 	return buildMetadata({
 		title: tool.title,

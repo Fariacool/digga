@@ -10,7 +10,7 @@
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",
-		"test": "node --experimental-strip-types --test tests/auth-core.test.ts",
+		"test": "node --experimental-strip-types --test tests/auth-core.test.ts tests/site-origin.test.ts",
 		"test:auth": "pnpm test && pnpm build && pnpm test:http",
 		"test:http": "node --experimental-strip-types --test tests/auth-http.test.ts tests/runtime-config-http.test.ts",
 		"test:format": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss}\"",

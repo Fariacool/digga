@@ -9,11 +9,13 @@ import { isRequestAuthorized } from '@/lib/auth-server';
 import { buildMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = buildMetadata({
-	title: 'Unlock digga',
-	path: '/unlock',
-	noIndex: true,
-});
+export function generateMetadata(): Promise<Metadata> {
+	return buildMetadata({
+		title: 'Unlock digga',
+		path: '/unlock',
+		noIndex: true,
+	});
+}
 
 export default async function UnlockPage({ searchParams }: PageProps<'/unlock'>) {
 	const params = await searchParams;

@@ -70,16 +70,28 @@ Build the image without application configuration. Set all deployment values in
 the server's `.env`; no GitHub Actions application variables are needed. The
 same image can run with different settings on different servers.
 
-| Environment variable             | Purpose                                                                     | Default                    |
-| -------------------------------- | --------------------------------------------------------------------------- | -------------------------- |
-| `SITE_URL`                       | Public origin for this instance's metadata, robots.txt, sitemaps, and links | `http://localhost:3000`    |
-| `NEXT_PUBLIC_ANALYTICS_SCRIPT`   | Optional analytics script URL                                               | Empty (analytics disabled) |
-| `NEXT_PUBLIC_ANALYTICS_ID`       | Optional analytics website ID                                               | Empty (analytics disabled) |
-| `NEXT_PUBLIC_ANALYTICS_DOMAINS`  | Optional analytics domain filter                                            | Empty (no domain filter)   |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional Turnstile public site key                                          | Empty                      |
+| Environment variable             | Purpose                                                                       | Default                               |
+| -------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------- |
+| `SITE_URL`                       | Optional public origin override for metadata, robots.txt, sitemaps, and links | Empty (detected from request headers) |
+| `NEXT_PUBLIC_ANALYTICS_SCRIPT`   | Optional analytics script URL                                                 | Empty (analytics disabled)            |
+| `NEXT_PUBLIC_ANALYTICS_ID`       | Optional analytics website ID                                                 | Empty (analytics disabled)            |
+| `NEXT_PUBLIC_ANALYTICS_DOMAINS`  | Optional analytics domain filter                                              | Empty (no domain filter)              |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional Turnstile public site key                                            | Empty                                 |
 
-Set `SITE_URL` to this instance's deployed origin. Pages and deployment metadata
-read it at runtime. The existing `NEXT_PUBLIC_*` names are retained for
+Leave `SITE_URL` unset or empty to detect the external origin on each request.
+The app reads the first `X-Forwarded-Host` value, falling back to `Host`, and
+uses `X-Forwarded-Proto` for HTTP/HTTPS (HTTP when absent). A non-empty
+`SITE_URL` overrides this detection. Supply an HTTP(S) origin without a path;
+surrounding whitespace and a trailing slash are normalized.
+
+Cloudflare Tunnel can forward to the container's internal HTTP address while
+visitors use an external HTTPS hostname. Keep `SITE_URL` empty and pass the
+public host and protocol headers through the proxy. Changing the Tunnel's
+public hostname then requires no container or image change. Forwarded headers
+are expected to come from your reverse proxy.
+
+Pages and deployment metadata use the resolved origin at request time. The
+existing `NEXT_PUBLIC_*` names are retained for
 compatibility; the server reads them at runtime and passes the required public
 values to the browser. Changing these values requires recreating the container,
 without rebuilding the image.
@@ -89,6 +101,9 @@ credentials in the server's `.env`. Environment files are excluded from the
 Docker build context. For Turnstile, configure both its public site key and
 matching `TURNSTILE_SECRET` in `.env`.
 
+The manual `pnpm indexnow:submit` command has no incoming request to inspect;
+provide `SITE_URL` in that command's environment when using it.
+
 ### Run with Docker Compose
 
 Install Docker Engine and Docker Compose v2. Place `docker-compose.yml`,
@@ -97,7 +112,7 @@ Install Docker Engine and Docker Compose v2. Place `docker-compose.yml`,
 
 ```bash
 ./compose init
-# Edit .env: set SITE_URL and optionally API_KEY or provider credentials.
+# Edit .env if you need API_KEY or provider credentials; SITE_URL can stay empty.
 ./compose upgrade
 ./compose ps
 ./compose logs

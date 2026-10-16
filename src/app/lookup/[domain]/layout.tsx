@@ -39,11 +39,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 		});
 	}
 	return {
-		...buildMetadata({
+		...(await buildMetadata({
 			title: `${normalized} · Lookup`,
 			description: `DNS records, RDAP, WHOIS, subdomains, and email security for ${normalized}.`,
 			path: `/lookup/${normalized}`,
-		}),
+		})),
 		title: { default: `${normalized} · Lookup`, template: `%s · ${SITE_NAME}` },
 	};
 }
@@ -78,7 +78,8 @@ const LookupLayout: FC<Props> = async ({ children, params }) => {
 	}
 
 	const display = toUnicodeDomain(normalized);
-	const lookupUrl = absoluteUrl(`/lookup/${normalized}`);
+	const lookupUrl = await absoluteUrl(`/lookup/${normalized}`);
+	const homeUrl = await absoluteUrl('/');
 	const tld = getTLD(normalized) ?? undefined;
 	const baseDomain = getBaseDomain(normalized);
 	const parentDomain = isSubdomain(normalized) && baseDomain !== normalized ? baseDomain : null;
@@ -93,7 +94,7 @@ const LookupLayout: FC<Props> = async ({ children, params }) => {
 						'@type': 'ListItem',
 						'position': 1,
 						'name': SITE_NAME,
-						'item': absoluteUrl('/'),
+						'item': homeUrl,
 					},
 					{
 						'@type': 'ListItem',
@@ -115,7 +116,7 @@ const LookupLayout: FC<Props> = async ({ children, params }) => {
 				'isPartOf': {
 					'@type': 'WebSite',
 					'name': SITE_NAME,
-					'url': absoluteUrl('/'),
+					'url': homeUrl,
 				},
 				'isBasedOn': `https://digga.dev/lookup/${normalized}`,
 			},

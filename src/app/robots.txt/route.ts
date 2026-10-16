@@ -2,8 +2,8 @@ import { siteUrl } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
-export function GET(): Response {
-	const base = siteUrl();
+export async function GET(): Promise<Response> {
+	const base = await siteUrl();
 	const body = `User-agent: *
 Allow: /
 Disallow: /api/

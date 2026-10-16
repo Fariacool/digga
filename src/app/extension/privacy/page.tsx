@@ -3,12 +3,14 @@ import type { FC } from 'react';
 import { SITE_NAME } from '@/lib/data';
 import { buildMetadata } from '@/lib/seo';
 
-export const metadata = buildMetadata({
-	title: 'Privacy Policy · digga Domain Lookup',
-	description: 'Privacy policy for the digga Domain Lookup browser extension.',
-	path: '/extension/privacy',
-	noIndex: true,
-});
+export function generateMetadata() {
+	return buildMetadata({
+		title: 'Privacy Policy · digga Domain Lookup',
+		description: 'Privacy policy for the digga Domain Lookup browser extension.',
+		path: '/extension/privacy',
+		noIndex: true,
+	});
+}
 
 const Page: FC = () => (
 	<div className="mx-auto w-full max-w-2xl px-5 py-16 sm:py-24">

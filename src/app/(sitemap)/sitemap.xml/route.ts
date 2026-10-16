@@ -3,9 +3,8 @@ import { renderSitemapIndex, XML_RESPONSE_HEADERS } from '@/lib/sitemap';
 
 export const dynamic = 'force-dynamic';
 
-export function GET() {
-	const base = siteUrl();
-	if (!base) return new Response('', { status: 404 });
+export async function GET() {
+	const base = await siteUrl();
 
 	const sitemaps = [{ loc: `${base}/sitemap-pages.xml` }, { loc: `${base}/sitemap-common.xml` }];
 

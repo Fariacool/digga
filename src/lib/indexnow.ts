@@ -19,7 +19,7 @@ export async function submitToIndexNow(urls: readonly string[]): Promise<IndexNo
 	const key = getIndexNowKey();
 	if (!key) return { ok: false, skipped: 'no-key' };
 
-	const base = siteUrl();
+	const base = await siteUrl();
 	if (!base || base.startsWith('http://localhost')) {
 		return { ok: false, skipped: 'no-public-host' };
 	}

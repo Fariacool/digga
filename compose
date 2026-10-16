@@ -25,7 +25,7 @@ ensure_docker() {
 ensure_env() {
   if [ ! -f .env ]; then
     (umask 077 && cp .env.example .env)
-    echo "Created .env from .env.example. Review SITE_URL and optional API_KEY before deployment." >&2
+    echo "Created .env from .env.example. Review optional API_KEY and provider settings before deployment." >&2
   fi
 }
 
@@ -54,11 +54,12 @@ Commands:
 
 Before first use:
   Run ./compose init, review .env, then run ./compose upgrade.
-  Set SITE_URL to the public URL of this instance.
+  Leave SITE_URL empty to detect the public origin from request headers.
   API_KEY is optional; leave it empty for public access.
 
 Common overrides in .env or the shell:
   IMAGE_NAME             Image/tag to run, default ghcr.io/fariacool/digga:latest
+  SITE_URL               Optional public origin override, default auto-detected
   HOST_BIND_ADDRESS      Host interface to bind, default 0.0.0.0
   HOST_PORT              Published HTTP port, default 3000
   COMPOSE_PROJECT_NAME   Compose project name, defaults to the directory name

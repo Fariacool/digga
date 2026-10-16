@@ -5,9 +5,8 @@ import { compareLengthThenAlpha, deduplicate } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
-export function GET() {
-	const base = siteUrl();
-	if (!base) return new Response('', { status: 404 });
+export async function GET() {
+	const base = await siteUrl();
 
 	const domains = deduplicate(commonDomains as string[]).sort(compareLengthThenAlpha);
 

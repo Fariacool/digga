@@ -15,11 +15,13 @@ import { EXAMPLE_DOMAINS, SITE_DESCRIPTION, SITE_NAME } from '@/lib/data';
 import { absoluteUrl, buildMetadata } from '@/lib/seo';
 import { TOOL_LIST } from '@/lib/tools';
 
-export const metadata: Metadata = buildMetadata({
-	title: 'digga · Domain & Infrastructure research',
-	description: SITE_DESCRIPTION,
-	path: '/',
-});
+export function generateMetadata(): Promise<Metadata> {
+	return buildMetadata({
+		title: 'digga · Domain & Infrastructure research',
+		description: SITE_DESCRIPTION,
+		path: '/',
+	});
+}
 
 type Feature = {
 	number: string;
@@ -171,30 +173,45 @@ const FAQ = [
 	},
 ];
 
-const websiteSchema = {
-	'@context': 'https://schema.org',
-	'@type': 'WebSite',
-	'name': SITE_NAME,
-	'description': SITE_DESCRIPTION,
-	'url': absoluteUrl('/'),
-	'potentialAction': {
-		'@type': 'SearchAction',
-		'target': `${absoluteUrl('/lookup')}/{search_term_string}`,
-		'query-input': 'required name=search_term_string',
-	},
-};
+async function HomeSchemas() {
+	const homeUrl = await absoluteUrl('/');
+	const websiteSchema = {
+		'@context': 'https://schema.org',
+		'@type': 'WebSite',
+		'name': SITE_NAME,
+		'description': SITE_DESCRIPTION,
+		'url': homeUrl,
+		'potentialAction': {
+			'@type': 'SearchAction',
+			'target': `${homeUrl}lookup/{search_term_string}`,
+			'query-input': 'required name=search_term_string',
+		},
+	};
 
-const softwareSchema = {
-	'@context': 'https://schema.org',
-	'@type': 'SoftwareApplication',
-	'name': SITE_NAME,
-	'applicationCategory': 'DeveloperApplication',
-	'operatingSystem': 'Any',
-	'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
-	'url': absoluteUrl('/'),
-	'description': SITE_DESCRIPTION,
-	'featureList': FEATURES.map(feature => feature.title),
-};
+	const softwareSchema = {
+		'@context': 'https://schema.org',
+		'@type': 'SoftwareApplication',
+		'name': SITE_NAME,
+		'applicationCategory': 'DeveloperApplication',
+		'operatingSystem': 'Any',
+		'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
+		'url': homeUrl,
+		'description': SITE_DESCRIPTION,
+		'featureList': FEATURES.map(feature => feature.title),
+	};
+	return (
+		<>
+			<script
+				type="application/ld+json"
+				dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+			/>
+			<script
+				type="application/ld+json"
+				dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
+			/>
+		</>
+	);
+}
 
 const howToSchema = {
 	'@context': 'https://schema.org',
@@ -222,14 +239,7 @@ const faqSchema = {
 
 const Home: FC = () => (
 	<div className="w-full">
-		<script
-			type="application/ld+json"
-			dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
-		/>
-		<script
-			type="application/ld+json"
-			dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
-		/>
+		<HomeSchemas />
 		<script
 			type="application/ld+json"
 			dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}

@@ -12,15 +12,16 @@ import { TOOLS, type ToolSlug } from '@/lib/tools';
 
 type ToolLandingProps = { slug: ToolSlug };
 
-const ToolLanding: FC<ToolLandingProps> = ({ slug }) => {
+const ToolLanding: FC<ToolLandingProps> = async ({ slug }) => {
 	const tool = TOOLS[slug];
-	const toolUrl = absoluteUrl(`/${tool.slug}`);
+	const toolUrl = await absoluteUrl(`/${tool.slug}`);
+	const homeUrl = await absoluteUrl('/');
 
 	const breadcrumbSchema = {
 		'@context': 'https://schema.org',
 		'@type': 'BreadcrumbList',
 		'itemListElement': [
-			{ '@type': 'ListItem', 'position': 1, 'name': SITE_NAME, 'item': absoluteUrl('/') },
+			{ '@type': 'ListItem', 'position': 1, 'name': SITE_NAME, 'item': homeUrl },
 			{ '@type': 'ListItem', 'position': 2, 'name': tool.name, 'item': toolUrl },
 		],
 	};
@@ -34,7 +35,7 @@ const ToolLanding: FC<ToolLandingProps> = ({ slug }) => {
 		'applicationCategory': 'DeveloperApplication',
 		'operatingSystem': 'Any',
 		'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
-		'isPartOf': { '@type': 'WebSite', 'name': SITE_NAME, 'url': absoluteUrl('/') },
+		'isPartOf': { '@type': 'WebSite', 'name': SITE_NAME, 'url': homeUrl },
 		'isBasedOn': `https://digga.dev/${tool.slug}`,
 	};
 
