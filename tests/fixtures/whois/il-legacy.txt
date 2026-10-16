@@ -1,0 +1,15 @@
+query:        example.org.il
+reg-name:     example
+domain:       example.org.il
+admin-c:      EX-ADMIN-IL
+tech-c:       EX-TECH-IL
+nserver:      ns1.example.org.il
+validity:     11-01-2029
+changed:      registrar AT registry.example 19960111 (Assigned)
+changed:      domain-registrar AT registry.example 20201019 (Changed)
+
+person:       Example Contact
+nic-hdl:      EX-ADMIN-IL
+changed:      contact AT registry.example 20300101 (Changed)
+
+registrar name: Example Registrar

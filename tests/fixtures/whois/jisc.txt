@@ -1,0 +1,22 @@
+Domain:
+	example.ac.uk
+
+Registered For:
+	Example University
+
+Registered By:
+	Jisc Services Limited
+
+Servers:
+	ns1.example.ac.uk	192.0.2.1
+	ns1.example.ac.uk	2001:db8::1
+	ns2.example.ac.uk
+
+Renewal date:
+	Tuesday 23rd Nov 2027
+
+Entry updated:
+	Saturday 23rd August 2025
+
+Entry created:
+	Thursday 18th September 2003

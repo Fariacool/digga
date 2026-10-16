@@ -1,0 +1,19 @@
+query:        example.co.il
+reg-name:     example
+domain:       example.co.il
+registrant:   Example Organisation
+nserver:      ns1.example.co.il
+assigned:     02-10-2014
+validity:     02-10-2027
+DNSSEC:       unsigned
+status:       Transfer Locked
+changed:      domain-registrar AT registry.example 20141002 (Assigned)
+changed:      domain-registrar AT registry.example 20190828 (Changed)
+
+admin e-mail: admin AT example.co.il
+changed:      contact AT registry.example 20300101 (Changed)
+
+tech e-mail: tech AT example.co.il
+changed:      Managing Registrar 20310101
+
+registrar name: Example Registrar

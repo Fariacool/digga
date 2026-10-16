@@ -1,0 +1,6 @@
+Domain Name: example.com.pe
+Sponsoring Registrar: NIC.PE
+Domain Status: ok
+Registrant Name: Example Organisation
+Name Server: ns1.example.com.pe
+>>> Last update of WHOIS database: 2026-10-16T13:11:42.510Z <<<

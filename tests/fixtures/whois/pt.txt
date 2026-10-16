@@ -1,0 +1,7 @@
+Domain: example.pt
+Domain Status: Registered
+Creation Date: 20/02/2012 17:08:39
+Expiration Date: 20/02/2027 23:59:39
+Admin Name: Example Registrar
+Name Server: ns1.example.pt | IPv4:  and IPv6:
+Name Server: ns2.example.pt | IPv4:  and IPv6:

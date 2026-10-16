@@ -2,20 +2,11 @@ import { domainToASCII } from 'node:url';
 
 import { normalizeRdap } from '../rdap/normalize.ts';
 import type { RdapDomain } from '../rdap/types.ts';
+import { isoDate } from './dates.ts';
 import { emptyRecord, LookupError, type WhoisData } from './model.ts';
+import { registryWhoisBlock } from './registries.ts';
 
-export function isoDate(value: string | undefined): string | null {
-	if (!value || !/\d{4}/.test(value)) return null;
-	const trimmed = value.trim();
-	// WHOIS frequently omits a timezone; interpret those timestamps as UTC.
-	const date = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(trimmed)
-		? `${trimmed.replace(' ', 'T')}Z`
-		: /^\d{1,2}-[A-Za-z]{3}-\d{4}$/.test(trimmed)
-			? `${trimmed} UTC`
-			: trimmed;
-	const timestamp = Date.parse(date);
-	return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
-}
+export { isoDate } from './dates.ts';
 
 function dates(events: WhoisData['events']): WhoisData['dates'] {
 	return {
@@ -92,15 +83,20 @@ function strings(value: unknown): string[] {
 
 export function whoisTextError(raw: string): LookupError | null {
 	if (
-		/rate[ -]limit (?:exceeded|reached)|quota exceeded|too many (?:requests|queries)|query limit (?:exceeded|reached)|exceeded (?:the )?(?:rate[ -]limit|query quota)|access denied|temporarily blocked/i.test(
+		/rate[ -]limit(?:ing)?(?: is| has been)? (?:exceeded|reached)|quota exceeded|too many (?:requests|queries)|query limit (?:exceeded|reached)|exceeded (?:the )?(?:rate[ -]limit|query quota)/i.test(
 			raw,
 		)
 	) {
 		return new LookupError(
 			'UPSTREAM_RATE_LIMITED',
-			'The upstream WHOIS server refused or rate limited the query.',
+			'The upstream WHOIS server rate limited the query. Retry later.',
 			60,
 		);
+	}
+	if (
+		/access denied|permission denied|not authori[sz]ed|query refused|temporarily blocked/i.test(raw)
+	) {
+		return new LookupError('LOOKUP_FAILED', 'The upstream WHOIS server refused access.');
 	}
 	return null;
 }
@@ -112,11 +108,16 @@ export function isWhoisNotFound(raw: string): boolean {
 }
 
 export function whoisRecord(domain: string, results: Record<string, WhoisBlock>): WhoisData {
-	const blocks = Object.entries(results);
-	const records = blocks.filter(([, block]) =>
-		strings(block['Domain Name']).some(
-			name => domainToASCII(name).toLowerCase().replace(/\.$/, '') === domain,
-		),
+	const blocks = Object.entries(results).map(
+		([server, block]) => [server, registryWhoisBlock(domain, server, block)] as const,
+	);
+	const records = blocks.filter(
+		([, block]) =>
+			!block.error &&
+			!whoisTextError(strings(block.__raw).join('\n')) &&
+			strings(block['Domain Name']).some(
+				name => domainToASCII(name).toLowerCase().replace(/\.$/, '') === domain,
+			),
 	);
 	if (!records.length) {
 		for (const [, block] of blocks) {

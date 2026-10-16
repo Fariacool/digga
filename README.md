@@ -92,6 +92,11 @@ HTTP 400 for invalid input, 401 for authentication, 422 for unsupported suffixes
 429 for upstream rate limits, 502 for upstream failures, 503 for a full queue,
 and 504 for timeouts. Use `error.code`, not the human-readable message, in
 clients. A `Retry-After` header accompanies retry delays on single requests.
+Error messages identify the public upstream hostname and discovery/query stage.
+Access refusals use `LOOKUP_FAILED`; only explicit rate limits use
+`UPSTREAM_RATE_LIMITED`. Registered records with no public dates remain successful
+partial records. See [upstream routing and date rules](./docs/whois-upstreams.md)
+for registry-specific behavior, including Jisc `.ac.uk` and unsupported `.nhs.uk`.
 
 `POST /api/whois/batch` accepts only `{ "domains": ["example.com", ...] }` with
 `Content-Type: application/json` and a maximum 64 KiB body. Defaults allow 1–10

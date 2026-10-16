@@ -1,0 +1,23 @@
+[Domain]
+Domain: example.lv
+Status: active
+
+[Holder]
+Type: Legal person
+Country: LV
+Name: Example Organisation
+RegNr: 20261016
+
+[Tech]
+Type: Natural person
+
+[Registrar]
+Type: Legal person
+Name: Example Registrar
+RegNr: 19960111
+
+[Nservers]
+Nserver: ns1.example.lv
+
+[Whois]
+Updated: 2026-10-16T11:12:38.391868+00:00

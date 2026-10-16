@@ -1,0 +1,10 @@
+DOMAIN NAME: example.bg (example.bg)
+registration status: busy, active
+
+NAME SERVER INFORMATION:
+ns1.example.bg
+ns2.example.bg
+
+DNSSEC: inactive
+
+According to REGULATION (EU) 2016/679 personal data is not published.

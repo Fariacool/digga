@@ -18,7 +18,7 @@ export const schemas = {
 			type: 'string',
 			enum: ['registered', 'not_found'],
 			description:
-				'not_found means the registry returned no record. It does not guarantee that a domain can be registered.',
+				'not_found means the authoritative registration service returned no record. It does not guarantee availability. A registered record with null dates is a valid partial result, not not_found.',
 		},
 		source: { type: 'string', enum: ['rdap', 'whois'] },
 		server: { type: 'string', description: 'The responding RDAP origin or WHOIS hostname.' },
@@ -77,7 +77,11 @@ export const schemas = {
 			required: ['code', 'message', 'retryable'],
 			properties: {
 				code: { type: 'string', enum: Object.keys(ERROR_STATUS) },
-				message: { type: 'string' },
+				message: {
+					type: 'string',
+					description:
+						'Diagnostic text including the public upstream and stage when known. Use code for client logic.',
+				},
 				retryable: { type: 'boolean' },
 				retryAfterSeconds: { type: 'integer', minimum: 1 },
 			},

@@ -1,0 +1,9 @@
+Domain Name: example.com.au
+Registry Domain ID: EXAMPLE-AU
+Registrar WHOIS Server: whois.auda.org.au
+Last Modified: 2026-09-09T05:04:46Z
+Registrar Name: Example Registrar
+Name Server: ns1.example.com.au
+DNSSEC: unsigned
+Registrant ID: ABN 20261016123
+>>> Last update of WHOIS database: 2026-10-16T13:16:17Z <<<

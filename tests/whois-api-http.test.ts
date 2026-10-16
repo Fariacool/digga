@@ -262,6 +262,63 @@ for (const key of [KEY, '']) {
 			);
 		});
 
+		it('uses the authoritative subregistry and IANA routes without false missing records', async () => {
+			const response = await read(
+				await batch(['example.ac.uk', '111.nhs.uk', 'example.pt', 'example.co.il']),
+				200,
+				'WhoisBatch',
+			);
+			assert.equal(response.results[0].data.server, 'whois.ja.net');
+			assert.equal(response.results[0].data.dates.createdAt, '2003-09-18T00:00:00.000Z');
+			assert.equal(response.results[1].error.code, 'UNSUPPORTED_TLD');
+			assert.equal(response.results[1].error.retryable, false);
+			assert.equal(response.results[2].data.server, 'whois.dns.pt');
+			assert.equal(response.results[2].data.dates.createdAt, '2012-02-20T17:08:39.000Z');
+			assert.equal(response.results[3].data.dates.createdAt, '2014-10-02T00:00:00.000Z');
+			assert.equal(
+				server.calls.some(
+					call => call.protocol === 'rdap' && ['example.ac.uk', '111.nhs.uk'].includes(call.domain),
+				),
+				false,
+			);
+			assert.equal(
+				server.calls.some(call => call.protocol === 'whois' && call.domain === '111.nhs.uk'),
+				false,
+			);
+			await read(await call('/api/whois?domain=example.fr'), 422, 'WhoisFailure');
+			assert.equal(
+				server.calls.some(call => call.host === 'status:'),
+				false,
+			);
+		});
+
+		it('preserves 403 fallback, registered no-date data and WHOIS refusal diagnostics', async () => {
+			const response = await read(
+				await batch(['example.com.au', 'example.lv', 'example.com.pe', 'example.bg']),
+				200,
+				'WhoisBatch',
+			);
+			assert.deepEqual(response.summary, { total: 4, succeeded: 4, failed: 0 });
+			assert.equal(response.results[0].data.source, 'whois');
+			assert.equal(response.results[0].data.dates.createdAt, null);
+			for (const result of response.results.slice(1)) {
+				assert.equal(result.data.registrationStatus, 'registered');
+				assert.deepEqual(result.data.dates, { createdAt: null, updatedAt: null, expiresAt: null });
+			}
+			const refused = await read(await call('/api/whois?domain=denied.bg'), 502, 'WhoisFailure');
+			assert.equal(refused.error.code, 'LOOKUP_FAILED');
+			assert.match(refused.error.message, /WHOIS query to whois\.register\.bg.*refused access/);
+			assert.equal(refused.error.retryAfterSeconds, undefined);
+			await read(await call('/api/whois?domain=another.bg'), 200, 'WhoisSuccess');
+			const bothFailed = await read(
+				await call('/api/whois?domain=denied.com.au'),
+				502,
+				'WhoisFailure',
+			);
+			assert.match(bothFailed.error.message, /whois\.auda\.org\.au/);
+			assert.match(bothFailed.error.message, /forbidden\.fixture\.example returned HTTP 403/);
+		});
+
 		it('keeps timeouts and malformed upstream data as errors, without caching them', async () => {
 			const response = await read(
 				await batch(['malformed.com', 'timeout.com', 'example.com']),
@@ -284,6 +341,7 @@ for (const key of [KEY, '']) {
 			assert.equal(first.headers.get('retry-after'), '120');
 			const body = await read(first, 429, 'WhoisFailure');
 			assert.equal(body.error.code, 'UPSTREAM_RATE_LIMITED');
+			assert.match(body.error.message, /RDAP request to limited\.fixture\.example/);
 			const response = await read(await batch(['another.net', 'example.com']), 200, 'WhoisBatch');
 			assert.equal(response.results[0].error.code, 'UPSTREAM_RATE_LIMITED');
 			assert.ok(response.results[0].error.retryAfterSeconds >= 119);
@@ -292,6 +350,29 @@ for (const key of [KEY, '']) {
 				server.calls.some(call => call.protocol === 'whois' && call.domain.endsWith('.net')),
 				false,
 			);
+		});
+
+		it('bounds WHOIS rate limits and isolates the registry and discovery cooldowns', async () => {
+			const limited = await read(
+				await call('/api/whois?domain=whois-rate.bg'),
+				429,
+				'WhoisFailure',
+			);
+			assert.match(limited.error.message, /WHOIS query to whois\.register\.bg/);
+			const count = server.calls.filter(call => call.host === 'whois.register.bg').length;
+			await read(await call('/api/whois?domain=cooldown.bg'), 429, 'WhoisFailure');
+			assert.equal(server.calls.filter(call => call.host === 'whois.register.bg').length, count);
+			await read(await call('/api/whois?domain=example.com'), 200, 'WhoisSuccess');
+			const discovery = await read(
+				await call('/api/whois?domain=example.ac.at'),
+				429,
+				'WhoisFailure',
+			);
+			assert.match(discovery.error.message, /WHOIS discovery for \.at.*whois\.iana\.org/);
+			const calls = server.calls.length;
+			const next = await read(await call('/api/whois?domain=example.gov.mn'), 429, 'WhoisFailure');
+			assert.match(next.error.message, /WHOIS discovery for \.mn.*whois\.iana\.org/);
+			assert.equal(server.calls.length, calls);
 		});
 
 		it('serves the public reference without exposing credentials', async () => {

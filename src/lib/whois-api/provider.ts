@@ -5,6 +5,7 @@ import type { RdapDomain } from '../rdap/types.ts';
 import { MAX_RESPONSE_BYTES, UPSTREAM_TIMEOUT_MS } from './config.ts';
 import { emptyRecord, LookupError, type WhoisData } from './model.ts';
 import { rdapRecord, whoisRecord, whoisTextError } from './normalize.ts';
+import { subregistryRoute } from './registries.ts';
 import { UpstreamScheduler } from './scheduler.ts';
 
 const BOOTSTRAP_URL = 'https://data.iana.org/rdap/dns.json';
@@ -31,6 +32,11 @@ function upstreamError(error: unknown, signal: AbortSignal): LookupError {
 		return new LookupError('LOOKUP_TIMEOUT', 'The upstream registration request timed out.');
 	}
 	return new LookupError('LOOKUP_FAILED', 'The upstream registration server could not be reached.');
+}
+
+function contextError(error: unknown, signal: AbortSignal, context: string): LookupError {
+	const cause = upstreamError(error, signal);
+	return new LookupError(cause.code, `${context}: ${cause.message}`, cause.retryAfterSeconds);
 }
 
 function safeUrl(value: string): URL {
@@ -133,7 +139,10 @@ export class RegistrationProvider {
 				typeof result.data === 'string' && result.status >= 300 && result.status < 400
 					? this.json(safeUrl(result.data), signal, redirects + 1)
 					: result,
-			);
+			)
+			.catch(error => {
+				throw contextError(error, signal, `RDAP request to ${key}`);
+			});
 	}
 
 	private async rdapServers(tld: string, signal: AbortSignal): Promise<string[]> {
@@ -146,6 +155,9 @@ export class RegistrationProvider {
 							throw new LookupError('LOOKUP_FAILED', 'RDAP server discovery failed.');
 						this.bootstrap = { value: data, expires: Date.now() + DISCOVERY_TTL };
 						return data;
+					})
+					.catch(error => {
+						throw contextError(error, signal, 'RDAP discovery via data.iana.org');
 					})
 					.finally(() => {
 						this.bootstrapPending = undefined;
@@ -161,39 +173,44 @@ export class RegistrationProvider {
 			throw new LookupError('LOOKUP_FAILED', 'The upstream returned an invalid WHOIS referral.');
 		}
 		const key = host.toLowerCase();
-		return this.scheduler.run(key, signal, async () => {
-			const timeout = AbortSignal.any([signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
-			try {
-				const raw = await new Promise<string>((resolve, reject) => {
-					const chunks: Buffer[] = [];
-					let size = 0;
-					const socket = connect({ host, port: 43, family: 4, signal: timeout }, () =>
-						socket.write(`${query}\r\n`),
-					);
-					socket.on('data', (chunk: Buffer) => {
-						size += chunk.byteLength;
-						if (size > MAX_RESPONSE_BYTES)
-							socket.destroy(
-								new LookupError('LOOKUP_FAILED', 'The upstream WHOIS response was too large.'),
-							);
-						else chunks.push(chunk);
+		return this.scheduler
+			.run(key, signal, async () => {
+				const timeout = AbortSignal.any([signal, AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)]);
+				try {
+					const raw = await new Promise<string>((resolve, reject) => {
+						const chunks: Buffer[] = [];
+						let size = 0;
+						const socket = connect({ host, port: 43, family: 4, signal: timeout }, () =>
+							socket.write(`${query}\r\n`),
+						);
+						socket.on('data', (chunk: Buffer) => {
+							size += chunk.byteLength;
+							if (size > MAX_RESPONSE_BYTES)
+								socket.destroy(
+									new LookupError('LOOKUP_FAILED', 'The upstream WHOIS response was too large.'),
+								);
+							else chunks.push(chunk);
+						});
+						socket.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+						socket.on('error', reject);
+						socket.on('close', hadError => {
+							if (!hadError) resolve(Buffer.concat(chunks).toString('utf8'));
+						});
 					});
-					socket.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-					socket.on('error', reject);
-					socket.on('close', hadError => {
-						if (!hadError) resolve(Buffer.concat(chunks).toString('utf8'));
-					});
-				});
-				const error = whoisTextError(raw);
-				if (error) {
-					this.scheduler.cooldown(key, error.retryAfterSeconds!);
-					throw error;
+					const error = whoisTextError(raw);
+					if (error) {
+						if (error.code === 'UPSTREAM_RATE_LIMITED')
+							this.scheduler.cooldown(key, error.retryAfterSeconds!);
+						throw error;
+					}
+					return raw;
+				} catch (error) {
+					throw upstreamError(error, timeout);
 				}
-				return raw;
-			} catch (error) {
-				throw upstreamError(error, timeout);
-			}
-		});
+			})
+			.catch(error => {
+				throw contextError(error, signal, `WHOIS query to ${key}`);
+			});
 	}
 
 	private async whoisServer(tld: string, signal: AbortSignal): Promise<string | null> {
@@ -203,11 +220,16 @@ export class RegistrationProvider {
 		if (!pending) {
 			pending = this.rawWhois('whois.iana.org', tld, signal)
 				.then(raw => {
-					if (!/^domain:\s*\S+/im.test(raw))
+					if (raw.match(/^domain:[ \t]*(\S+)[ \t]*$/im)?.[1].toLowerCase() !== tld)
 						throw new LookupError('LOOKUP_FAILED', 'WHOIS server discovery failed.');
-					const host = raw.match(/^whois:\s*(\S+)/im)?.[1].toLowerCase() ?? null;
+					// A blank IANA "whois:" value must not consume the next line's
+					// "status:" label as a hostname (for example, .uk has no WHOIS).
+					const host = raw.match(/^whois:[ \t]*(\S+)[ \t]*$/im)?.[1].toLowerCase() ?? null;
 					this.whoisServers.set(tld, { host, expires: Date.now() + DISCOVERY_TTL });
 					return host;
+				})
+				.catch(error => {
+					throw contextError(error, signal, `WHOIS discovery for .${tld}`);
 				})
 				.finally(() => this.discoveryPending.delete(tld));
 			this.discoveryPending.set(tld, pending);
@@ -216,6 +238,14 @@ export class RegistrationProvider {
 	}
 
 	async lookup(domain: string, signal: AbortSignal): Promise<WhoisData> {
+		const route = subregistryRoute(domain);
+		if (route) {
+			if (route.host) return this.lookupWhois(domain, route.host, signal);
+			throw new LookupError(
+				'UNSUPPORTED_TLD',
+				`No public RDAP or WHOIS service is configured for .${route.suffix}; registration status is unknown.`,
+			);
+		}
 		const tld = domain.split('.').at(-1)!;
 		let rdapError: unknown;
 		try {
@@ -228,11 +258,16 @@ export class RegistrationProvider {
 					url.hash = '';
 					const result = await this.json(url, signal);
 					if (result.status === 404) return emptyRecord('rdap', result.server);
-					if (result.status === 200)
-						return rdapRecord(domain, result.server, result.data as RdapDomain);
+					if (result.status === 200) {
+						try {
+							return rdapRecord(domain, result.server, result.data as RdapDomain);
+						} catch (error) {
+							throw contextError(error, signal, `RDAP response from ${url.hostname}`);
+						}
+					}
 					throw new LookupError(
 						'LOOKUP_FAILED',
-						'The upstream RDAP server returned an unsuccessful response.',
+						`RDAP request to ${url.hostname} returned HTTP ${result.status}.`,
 					);
 				} catch (error) {
 					if (
@@ -250,14 +285,30 @@ export class RegistrationProvider {
 		}
 		if (signal.aborted)
 			throw new LookupError('LOOKUP_TIMEOUT', 'The registration lookup timed out.');
-		const host = await this.whoisServer(tld, signal);
-		if (!host) {
-			if (rdapError) throw rdapError;
-			throw new LookupError(
-				'UNSUPPORTED_TLD',
-				'No RDAP or WHOIS registration service is available for this suffix.',
-			);
+		try {
+			const host = await this.whoisServer(tld, signal);
+			if (!host) {
+				if (rdapError) throw rdapError;
+				throw new LookupError(
+					'UNSUPPORTED_TLD',
+					'No RDAP or WHOIS registration service is available for this suffix.',
+				);
+			}
+			return await this.lookupWhois(domain, host, signal);
+		} catch (error) {
+			if (rdapError instanceof LookupError && error !== rdapError) {
+				const cause = upstreamError(error, signal);
+				throw new LookupError(
+					cause.code,
+					`${cause.message} RDAP attempt: ${rdapError.message}`,
+					cause.retryAfterSeconds,
+				);
+			}
+			throw error;
 		}
+	}
+
+	private async lookupWhois(domain: string, host: string, signal: AbortSignal): Promise<WhoisData> {
 		const errors: LookupError[] = [];
 		const results = await whoisDomain(domain, {
 			host,
@@ -275,7 +326,11 @@ export class RegistrationProvider {
 		try {
 			return whoisRecord(domain, results);
 		} catch (error) {
-			throw errors.find(error => error.code === 'UPSTREAM_RATE_LIMITED') ?? errors[0] ?? error;
+			throw (
+				errors.find(error => error.code === 'UPSTREAM_RATE_LIMITED') ??
+				errors[0] ??
+				contextError(error, signal, `WHOIS response from ${host}`)
+			);
 		}
 	}
 }

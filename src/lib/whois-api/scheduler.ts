@@ -41,7 +41,7 @@ export class UpstreamScheduler {
 		}
 		return new LookupError(
 			'UPSTREAM_RATE_LIMITED',
-			'The upstream registration server is rate limited. Retry later.',
+			`The upstream registration server ${server} is rate limited. Retry later.`,
 			Math.max(1, Math.ceil((until - Date.now()) / 1000)),
 		);
 	}
