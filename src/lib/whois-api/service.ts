@@ -1,4 +1,5 @@
 import { CACHE_TTL_MS, LOOKUP_TIMEOUT_MS } from './config.ts';
+import { deadlineExpired, deadlineSignal } from './deadline.ts';
 import {
 	failure,
 	LookupError,
@@ -38,8 +39,11 @@ export class WhoisService {
 						throw new LookupError('BUSY', 'The lookup queue is full. Retry later.', 1);
 					}
 					const key = domain;
-					pending = this.provider(key, AbortSignal.timeout(LOOKUP_TIMEOUT_MS))
+					const signal = deadlineSignal(LOOKUP_TIMEOUT_MS);
+					pending = this.provider(key, signal)
 						.then(data => {
+							if (deadlineExpired(signal))
+								throw new LookupError('LOOKUP_TIMEOUT', 'The registration lookup timed out.');
 							const result = { data, fetchedAt: this.now() };
 							if (this.entries.size >= 2000) this.entries.delete(this.entries.keys().next().value!);
 							this.entries.set(key, result);

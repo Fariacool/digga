@@ -125,6 +125,112 @@ describe('registry routes and raw WHOIS formats', () => {
 			expiresAt: null,
 		});
 	});
+	it('reads only EE Domain lifecycle fields, excluding contact, registrar and nameserver changes', async () => {
+		const data = await fixture('ee', 'example.ee', 'whois.tld.ee');
+		assert.deepEqual(data.dates, {
+			createdAt: '2010-07-04T01:05:56.000Z',
+			updatedAt: '2026-04-14T10:23:27.000Z',
+			expiresAt: '2026-12-11T00:00:00.000Z',
+		});
+		assert.equal(data.registrar.name, 'Example Registrar');
+		assert.equal(data.registrant.name, 'Example Organisation');
+		assert.equal(data.registrant.country, 'EE');
+		assert.deepEqual(data.status, ['ok (paid and in zone)']);
+		assert.deepEqual(data.nameservers, ['ns1.example.ee', 'ns2.example.ee']);
+		const partial = await fixture('ee', 'example.ee', 'whois.tld.ee', raw =>
+			raw.replace(/^changed:    2026.*\n/m, '').replace(/\n/g, '\r\n'),
+		);
+		assert.equal(partial.registrationStatus, 'registered');
+		assert.equal(partial.dates.updatedAt, null);
+		const winter = await fixture('ee', 'example.ee', 'whois.tld.ee', raw =>
+			raw.replace('2010-07-04 04:05:56 +03:00', '2024-01-04 04:05:56 +02:00'),
+		);
+		assert.equal(winter.dates.createdAt, '2024-01-04T02:05:56.000Z');
+	});
+	it('rejects missing, ambiguous or mismatched EE Domain identity despite flattened aliases', async () => {
+		for (const transform of [
+			(raw: string) => raw.replace('name:       example.ee', 'name:       other.ee'),
+			(raw: string) => raw.replace('Domain:\n', ''),
+			(raw: string) => raw + '\nDomain:\nname: example.ee\n',
+			(raw: string) => raw.replace('status:', 'name: other.ee\nstatus:'),
+			(raw: string) => raw + '\nDomain Name: other.ee\n',
+		]) {
+			await assert.rejects(
+				fixture(
+					'ee',
+					'example.ee',
+					'whois.tld.ee',
+					raw => transform(raw) + '\nDomain Name: example.ee\n',
+				),
+			);
+		}
+	});
+	it('verifies NIC Chile footer identity and converts explicit CLST/CLT offsets', async () => {
+		const data = await fixture('cl', 'example.cl', 'whois.nic.cl');
+		assert.equal(data.registrationStatus, 'registered');
+		assert.deepEqual(data.dates, {
+			createdAt: '2008-05-16T00:37:12.000Z',
+			updatedAt: null,
+			expiresAt: '2027-06-11T21:33:00.000Z',
+		});
+		assert.equal(data.registrar.name, 'Example Registrar');
+		assert.equal(data.registrant.organization, 'Example Organisation');
+		assert.deepEqual(data.nameservers, ['ns1.example.cl', 'ns2.example.cl']);
+		const standard = await fixture('cl', 'example.cl', 'whois.nic.cl', raw =>
+			raw.replaceAll('CLST', 'CLT').replace(/\n/g, '\r\n'),
+		);
+		assert.equal(standard.dates.createdAt, '2008-05-16T01:37:12.000Z');
+		assert.equal(standard.dates.expiresAt, '2027-06-11T22:33:00.000Z');
+		const unknown = await fixture('cl', 'example.cl', 'whois.nic.cl', raw =>
+			raw.replaceAll('CLST', 'UNKNOWN'),
+		);
+		assert.equal(unknown.registrationStatus, 'registered');
+		assert.deepEqual(unknown.dates, { createdAt: null, updatedAt: null, expiresAt: null });
+		const invalid = await fixture('cl', 'example.cl', 'whois.nic.cl', raw =>
+			raw.replace('2008-05-15', '2008-02-31'),
+		);
+		assert.equal(invalid.dates.createdAt, null);
+	});
+	it('keeps CL host, suffix, structure and identity guards for arbitrary or conflicting replies', async () => {
+		for (const transform of [
+			(raw: string) => raw.replace('?d=example.cl', '?d=other.cl'),
+			(raw: string) => raw.replace('?d=example.cl', '?d=example.cl&d=other.cl'),
+			(raw: string) => raw.replace('www.nic.cl/registry', 'www.nic.cl.example/registry'),
+			(raw: string) => raw.replace(/^%% See.*\n/m, ''),
+			(raw: string) => raw + '\nDomain Name: other.cl\n',
+			(raw: string) => raw + '\n%% See https://www.nic.cl/registry/Whois.do?d=other.cl\n',
+			(raw: string) => raw.replace(/^(?:Registrant|Registrar|Creation|Expiration).*\n/gm, ''),
+			(raw: string) => raw + '\nAccess denied\n',
+			(raw: string) => raw + '\nQuery limit exceeded\n',
+		])
+			await assert.rejects(fixture('cl', 'example.cl', 'whois.nic.cl', transform));
+		await assert.rejects(fixture('cl', 'example.cl', 'whois.other.example'));
+		await assert.rejects(fixture('cl', 'example.com', 'whois.nic.cl'));
+	});
+	it('accepts CL no entries only for the authoritative host and exact echoed domain', () => {
+		const raw = '%% NIC Chile\r\n\r\nexample.cl: no entries found.\r\n';
+		const result = whoisRecord('example.cl', { 'whois.nic.cl': { __raw: raw } });
+		assert.equal(result.registrationStatus, 'not_found');
+		for (const [domain, host] of [
+			['other.cl', 'whois.nic.cl'],
+			['example.cl', 'whois.other.example'],
+			['example.com', 'whois.nic.cl'],
+		])
+			assert.throws(() => whoisRecord(domain, { [host]: { __raw: raw } }));
+	});
+	it('classifies the CH client refusal without inventing a rate limit or cooldown', () => {
+		const raw =
+			'Requests of this client are not permitted. Please use https://www.nic.ch/whois/ for queries.';
+		const error = whoisTextError(raw);
+		assert.equal(error?.code, 'LOOKUP_FAILED');
+		assert.match(error!.message, /refused access/);
+		assert.equal(error?.retryAfterSeconds, undefined);
+		assert.throws(
+			() => whoisRecord('example.ch', { 'whois.nic.ch': { __raw: raw } }),
+			/refused access/,
+		);
+		assert.equal(whoisTextError('The permitted use of WHOIS data is restricted.'), null);
+	});
 	it('requires complete valid dates and distinguishes rate limits from refusals', () => {
 		for (const invalid of [
 			'2026',

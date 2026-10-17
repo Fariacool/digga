@@ -1,3 +1,4 @@
+import { deadlineExpired } from './deadline.ts';
 import { LookupError } from './model.ts';
 
 type Job = {
@@ -6,6 +7,7 @@ type Job = {
 	start: () => void;
 	reject: (error: Error) => void;
 	onAbort: () => void;
+	timeout: () => LookupError;
 };
 
 // A permit covers a real outgoing connection, including discovery and referrals.
@@ -47,7 +49,7 @@ export class UpstreamScheduler {
 	}
 
 	run<T>(server: string, signal: AbortSignal, task: () => Promise<T>): Promise<T> {
-		if (signal.aborted)
+		if (deadlineExpired(signal))
 			return Promise.reject(new LookupError('LOOKUP_TIMEOUT', 'The lookup timed out.'));
 		const limited = this.rateLimit(server);
 		if (limited) return Promise.reject(limited);
@@ -55,6 +57,7 @@ export class UpstreamScheduler {
 			return Promise.reject(new LookupError('BUSY', 'The lookup queue is full. Retry later.', 1));
 		}
 		return new Promise<T>((resolve, reject) => {
+			const queuedAt = performance.now();
 			const job: Job = {
 				server,
 				signal,
@@ -62,18 +65,23 @@ export class UpstreamScheduler {
 				onAbort: () => {
 					const index = this.queue.indexOf(job);
 					if (index !== -1) this.queue.splice(index, 1);
-					reject(
-						new LookupError(
-							'LOOKUP_TIMEOUT',
-							'The lookup timed out while waiting for an upstream slot.',
-						),
-					);
+					reject(job.timeout());
 				},
+				timeout: () =>
+					new LookupError(
+						'LOOKUP_TIMEOUT',
+						`The lookup timed out while waiting for an upstream slot (${Math.max(0, Math.round(performance.now() - queuedAt))} ms queued).`,
+					),
 				start: () => {
 					this.active++;
 					this.perServer.set(server, (this.perServer.get(server) ?? 0) + 1);
 					void Promise.resolve()
-						.then(task)
+						.then(() => {
+							// Recheck at execution too: the permit was assigned synchronously,
+							// but this microtask may run after the total deadline.
+							if (deadlineExpired(signal)) throw job.timeout();
+							return task();
+						})
 						.then(resolve, reject)
 						.finally(() => {
 							this.active--;
@@ -94,11 +102,12 @@ export class UpstreamScheduler {
 		// Skip saturated hosts so one busy registry cannot block other registries.
 		for (let index = 0; index < this.queue.length;) {
 			const job = this.queue[index];
-			const limited = this.rateLimit(job.server);
-			if (limited || job.signal.aborted) {
+			const expired = deadlineExpired(job.signal);
+			const limited = expired ? null : this.rateLimit(job.server);
+			if (limited || expired) {
 				this.queue.splice(index, 1);
 				job.signal.removeEventListener('abort', job.onAbort);
-				job.reject(limited ?? new LookupError('LOOKUP_TIMEOUT', 'The lookup timed out.'));
+				job.reject(limited ?? job.timeout());
 			} else if (
 				this.active < this.maxConcurrent &&
 				(this.perServer.get(job.server) ?? 0) < this.perServerConcurrent

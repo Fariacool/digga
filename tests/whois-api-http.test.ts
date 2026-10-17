@@ -336,6 +336,38 @@ for (const key of [KEY, '']) {
 			);
 		});
 
+		it('parses EE and CL records, validates CL identity and preserves CH refusal classification', async () => {
+			const response = await read(
+				await batch(['example.ee', 'example.cl', 'missing.cl', 'denied.ch']),
+				200,
+				'WhoisBatch',
+			);
+			assert.deepEqual(response.summary, { total: 4, succeeded: 3, failed: 1 });
+			assert.equal(response.results[0].data.server, 'whois.tld.ee');
+			assert.deepEqual(response.results[0].data.dates, {
+				createdAt: '2010-07-04T01:05:56.000Z',
+				updatedAt: '2026-04-14T10:23:27.000Z',
+				expiresAt: '2026-12-11T00:00:00.000Z',
+			});
+			assert.equal(response.results[1].data.server, 'whois.nic.cl');
+			assert.equal(response.results[1].data.dates.createdAt, '2008-05-16T00:37:12.000Z');
+			assert.deepEqual(response.results[1].data.nameservers, ['ns1.example.cl', 'ns2.example.cl']);
+			assert.equal(response.results[2].data.registrationStatus, 'not_found');
+			assert.equal(response.results[3].error.code, 'LOOKUP_FAILED');
+			assert.match(response.results[3].error.message, /whois\.nic\.ch.*refused access/);
+			assert.equal(response.results[3].error.retryAfterSeconds, undefined);
+			const refused = await call('/api/whois?domain=denied.ch');
+			assert.equal(refused.headers.get('retry-after'), null);
+			await read(refused, 502, 'WhoisFailure');
+			await read(await call('/api/whois?domain=another.ch'), 200, 'WhoisSuccess');
+			const mismatched = await read(
+				await call('/api/whois?domain=mismatch.cl'),
+				502,
+				'WhoisFailure',
+			);
+			assert.equal(mismatched.error.code, 'LOOKUP_FAILED');
+		});
+
 		it('honors upstream Retry-After and shares cooldowns across single and batch', async () => {
 			const first = await call('/api/whois?domain=limited.net');
 			assert.equal(first.headers.get('retry-after'), '120');

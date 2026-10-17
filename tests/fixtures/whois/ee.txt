@@ -1,0 +1,34 @@
+Estonia .ee Top Level Domain WHOIS server
+
+Domain:
+name:       example.ee
+status:     ok (paid and in zone)
+registered: 2010-07-04 04:05:56 +03:00
+changed:    2026-04-14 13:23:27 +03:00
+expire:     2026-12-11
+outzone:
+delete:
+
+Registrant:
+name:       Example Organisation
+country:    EE
+changed:    2029-01-01 00:00:00 +02:00
+
+Administrative contact:
+name:       Example Contact
+changed:    Not Disclosed - Visit www.internet.ee for webbased WHOIS
+
+Technical contact:
+name:       Example Technical Contact
+changed:    2030-01-01 00:00:00 +02:00
+
+Registrar:
+name:       Example Registrar
+changed:    2031-01-01 00:00:00 +02:00
+
+Name servers:
+nserver:    ns1.example.ee
+nserver:    ns2.example.ee
+changed:    2032-01-01 00:00:00 +02:00
+
+Estonia .ee Top Level Domain WHOIS server

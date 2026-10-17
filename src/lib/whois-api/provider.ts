@@ -3,6 +3,7 @@ import { whoisDomain } from 'whoiser';
 
 import type { RdapDomain } from '../rdap/types.ts';
 import { MAX_RESPONSE_BYTES, UPSTREAM_TIMEOUT_MS } from './config.ts';
+import { deadlineExpired } from './deadline.ts';
 import { emptyRecord, LookupError, type WhoisData } from './model.ts';
 import { rdapRecord, whoisRecord, whoisTextError } from './normalize.ts';
 import { subregistryRoute } from './registries.ts';
@@ -291,7 +292,7 @@ export class RegistrationProvider {
 				throw error;
 			rdapError = error;
 		}
-		if (signal.aborted)
+		if (deadlineExpired(signal))
 			throw new LookupError('LOOKUP_TIMEOUT', 'The registration lookup timed out.');
 		try {
 			const host = await this.whoisServer(tld, signal);

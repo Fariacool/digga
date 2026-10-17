@@ -22,6 +22,8 @@ are checked before the TLD's RDAP server can incorrectly return `not_found`.
 | `.pe` and its public suffixes | IANA → `kero.yachay.pe` | Preserve genuine lifecycle fields if present. A WHOIS database footer is never a domain update. Sample replies have no lifecycle fields. |
 | `.au` and its public suffixes | IANA RDAP, then discovered WHOIS for ordinary failures such as HTTP 403 | Public creation, renewal and expiry are undisclosed. Domain `Last Modified` is valid; database refresh timestamps are not lifecycle dates. |
 | `.bg` | IANA → `whois.register.bg` | Accept the registry's `name.bg (name.bg)` identity and multiline nameservers. Do not invent dates when none are returned. |
+| `.ee` | IANA → `whois.tld.ee` | Validate the `Domain:` section's name; use only its `registered`, `changed`, `expire`. Preserve explicit numeric UTC offsets; contact, registrar and nameserver changes are excluded. |
+| `.cl` | IANA → `whois.nic.cl` | Validate the domain echoed in the NIC Chile footer query URL and the record structure. Interpret explicit CLST as UTC−03:00 and CLT as UTC−04:00; unknown/invalid dates remain null. Accept matching `<domain>: no entries found.` only from this registry. |
 
 Only complete, valid calendar dates are normalized. Numeric organisation IDs,
 bare years, arbitrary prose and impossible calendar days are rejected. WHOIS
@@ -34,6 +36,14 @@ Each lookup retains its 30-second total deadline, 5-second upstream deadline,
 two-hop WHOIS referral cap, scheduler limits, deduplication and bounded cache.
 There is no retry loop inside a lookup.
 
+The total deadline uses a monotonic clock as well as an abort signal. The
+scheduler checks it at admission, on dequeue and immediately before task
+execution, so a delayed abort callback cannot start an already expired request.
+Queue timeouts report how many milliseconds were spent waiting for a permit.
+Results completed after the total deadline are not returned as successes or
+cached. Queueing still consumes the 30-second budget; this does not increase
+capacity or guarantee that 100 simultaneous slow lookups can finish.
+
 - HTTP 429 and explicit WHOIS quota/rate-limit responses return
   `UPSTREAM_RATE_LIMITED` with `retryAfterSeconds`. The responding host enters
   cooldown; queued and subsequent requests to it fail fast. There is no switch
@@ -41,6 +51,9 @@ There is no retry loop inside a lookup.
 - A bare WHOIS `Access denied` / refusal returns `LOOKUP_FAILED`, without
   inventing a rate limit or a cooldown. An RDAP HTTP 403 can still fall back to
   authoritative WHOIS, as before.
+- NIC.CH's `Requests of this client are not permitted` is an access refusal,
+  not a malformed registration record or a quota response. It has no invented
+  `retryAfterSeconds` and does not put other queries into cooldown.
 - Error messages identify the public upstream hostname and request/discovery
   stage. If RDAP and WHOIS both fail, the final message retains the RDAP failure
   too. Clients should continue using `error.code`, not parsing messages.
@@ -83,7 +96,15 @@ On 2026-10-17 the deployment host reached `whois.dns.pt:43` over IPv6 in less
 than one second, while its IPv4 connection timed out. The existing container's
 IPv6 attempt returned `ENETUNREACH` and its IPv4 attempt also timed out. The
 running network had `EnableIPv6=false`; host IPv6 forwarding was `0`. These
-were read-only checks. Repository changes have not been applied to that server.
+were read-only checks. At that point the dual-stack repository changes had
+not been deployed to that server.
+
+A subsequent read-only check after the operator deployed `ceac2ae` found the
+new `digga_dualstack` network active and host IPv6 forwarding already enabled
+by Docker. A forced-IPv6 query from the container to `whois.dns.pt` connected
+in 323 ms and returned registration dates in 1,042 ms. No manual forwarding
+change was needed. To decide on another host, inspect both forwarding and
+actual container egress; an assigned IPv6 address alone does not prove routing.
 
 For an older stack, copy the updated Compose file when deploying the new image.
 The separate `<project>_dualstack` network avoids trying to change an existing
@@ -150,3 +171,10 @@ responses; keep measured outcomes separate from rule coverage.
 - [DNS.PT glossary](https://www.pt.pt/en/glossary/) and
   [WHOIS Policy](https://www.pt.pt/en/data-protection/pt-whois-policy/)
   describe registration/expiry data and access restrictions.
+- [EE registry system](https://www.internet.ee/registrar-portal/new-registry-system)
+  documents the registry WHOIS endpoint. The EE and CL adapters use verified
+  individual port 43 replies, including their section and identity formats.
+- [IANA tz discussion with explicit CLST/CLT offsets](https://lists.iana.org/hyperkitty/list/tz%40iana.org/thread/LVE7XSNGYUME75KS6M527ROS3LZDU3MD/?sort=date)
+  records CLST `gmtoff=-10800` and CLT `gmtoff=-14400`. The CL adapter honors
+  the explicit marker, rather than inferring an offset from current seasonal
+  rules for the date.

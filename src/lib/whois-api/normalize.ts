@@ -4,7 +4,7 @@ import { normalizeRdap } from '../rdap/normalize.ts';
 import type { RdapDomain } from '../rdap/types.ts';
 import { isoDate } from './dates.ts';
 import { emptyRecord, LookupError, type WhoisData } from './model.ts';
-import { registryWhoisBlock } from './registries.ts';
+import { registryWhoisBlock, registryWhoisNotFound } from './registries.ts';
 
 export { isoDate } from './dates.ts';
 
@@ -94,7 +94,9 @@ export function whoisTextError(raw: string): LookupError | null {
 		);
 	}
 	if (
-		/access denied|permission denied|not authori[sz]ed|query refused|temporarily blocked/i.test(raw)
+		/access denied|permission denied|not authori[sz]ed|query refused|temporarily blocked|(?:requests? (?:of|from) this client|this client(?:'s)? (?:requests?|queries)|queries (?:of|from) this client) (?:are|is) not permitted/i.test(
+			raw,
+		)
 	) {
 		return new LookupError('LOOKUP_FAILED', 'The upstream WHOIS server refused access.');
 	}
@@ -124,7 +126,10 @@ export function whoisRecord(domain: string, results: Record<string, WhoisBlock>)
 			const error = whoisTextError(strings(block.__raw).join('\n'));
 			if (error) throw error;
 		}
-		const missing = blocks.find(([, block]) => isWhoisNotFound(strings(block.__raw).join('\n')));
+		const missing = blocks.find(([server, block]) => {
+			const raw = strings(block.__raw).join('\n');
+			return isWhoisNotFound(raw) || registryWhoisNotFound(domain, server, raw);
+		});
 		if (missing) return emptyRecord('whois', missing[0]);
 		throw new LookupError('LOOKUP_FAILED', 'The upstream did not return a usable WHOIS record.');
 	}

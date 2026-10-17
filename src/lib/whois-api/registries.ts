@@ -13,12 +13,18 @@ export function subregistryRoute(domain: string): { host: string | null; suffix:
 	return null;
 }
 
-function rawFields(raw: string): Field[] {
+function rawFields(raw: string, ee = false): Field[] {
 	const fields: Field[] = [];
 	let section = '';
 	let current: Field | undefined;
 	for (const line of raw.split(/\r?\n/)) {
-		const heading = line.match(/^\[([^\]]+)\]\s*$/);
+		const heading =
+			line.match(/^\[([^\]]+)\]\s*$/) ??
+			(ee
+				? line.match(
+						/^(Domain|Registrant|Administrative contact|Technical contact|Registrar|Name servers):[ \t]*$/i,
+					)
+				: null);
 		if (heading) {
 			section = heading[1].toLowerCase();
 			current = undefined;
@@ -55,6 +61,42 @@ function isDomain(value: string, domain: string): boolean {
 	return domainToASCII(value).toLowerCase().replace(/\.$/, '') === domain;
 }
 
+function clDate(value: string): string | null {
+	// Honor the timestamp's explicit abbreviation, including historical dates;
+	// do not infer a seasonal offset from today's America/Santiago rules.
+	const parts = value.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) (CLST|CLT)$/);
+	return parts
+		? isoDate(`${parts[1]}T${parts[2]}${parts[3] === 'CLST' ? '-03:00' : '-04:00'}`)
+		: isoDate(value);
+}
+
+function clIdentity(raw: string, domain: string): boolean {
+	const links = [
+		...raw.matchAll(/^%% See (https:\/\/www\.nic\.cl\/registry\/Whois\.do\?\S+)[ \t]*\r?$/gm),
+	];
+	if (links.length !== 1) return false;
+	try {
+		const url = new URL(links[0][1]);
+		return (
+			url.origin === 'https://www.nic.cl' &&
+			!url.username &&
+			!url.password &&
+			!url.hash &&
+			url.pathname === '/registry/Whois.do' &&
+			url.searchParams.getAll('d').length === 1 &&
+			isDomain(url.searchParams.get('d')!, domain)
+		);
+	} catch {
+		return false;
+	}
+}
+
+export function registryWhoisNotFound(domain: string, server: string, raw: string): boolean {
+	if (server.toLowerCase() !== 'whois.nic.cl' || !domain.endsWith('.cl')) return false;
+	const missing = [...raw.matchAll(/^(\S+): no entries found\.[ \t]*\r?$/gm)];
+	return missing.length === 1 && isDomain(missing[0][1], domain);
+}
+
 // Adapt verified registry formats before flattened whoiser fields lose section
 // boundaries. Never infer a date from footer text or numeric IDs.
 export function registryWhoisBlock(domain: string, server: string, block: WhoisBlock): WhoisBlock {
@@ -64,9 +106,11 @@ export function registryWhoisBlock(domain: string, server: string, block: WhoisB
 	const il = host === 'whois.isoc.org.il' && domain.endsWith('.il');
 	const lv = host === 'whois.nic.lv' && domain.endsWith('.lv');
 	const bg = host === 'whois.register.bg' && domain.endsWith('.bg');
-	if (!jisc && !pt && !il && !lv && !bg) return block;
+	const ee = host === 'whois.tld.ee' && domain.endsWith('.ee');
+	const cl = host === 'whois.nic.cl' && domain.endsWith('.cl');
+	if (!jisc && !pt && !il && !lv && !bg && !ee && !cl) return block;
 	const raw = typeof block.__raw === 'string' ? block.__raw : '';
-	const fields = rawFields(raw);
+	const fields = rawFields(raw, ee);
 	const value = (label: string, section?: string) =>
 		fields.find(
 			field => field.label === label && (section === undefined || field.section === section),
@@ -74,6 +118,31 @@ export function registryWhoisBlock(domain: string, server: string, block: WhoisB
 	const result = { ...block };
 	const identity = value('domain', lv ? 'domain' : undefined) || value('domain name');
 	if (isDomain(identity, domain)) result['Domain Name'] = domain;
+	if (ee) {
+		const domainSections = raw.match(/^Domain:[ \t]*\r?$/gim)?.length ?? 0;
+		const identities = fields.filter(field => field.section === 'domain' && field.label === 'name');
+		const echoes = fields.filter(field => field.label === 'domain name');
+		result['Domain Name'] =
+			domainSections === 1 &&
+			identities.length === 1 &&
+			isDomain(identities[0].value, domain) &&
+			echoes.every(field => isDomain(field.value, domain))
+				? domain
+				: null;
+	} else if (cl) {
+		// NIC Chile echoes the queried name in a registry URL rather than a
+		// Domain Name field. Require both that identity and the record structure.
+		const echoes = fields.filter(field => ['domain', 'domain name'].includes(field.label));
+		const structured =
+			Boolean(value('registrar name')) &&
+			['registrant name', 'creation date', 'expiration date'].every(label =>
+				fields.some(field => field.label === label),
+			);
+		result['Domain Name'] =
+			structured && clIdentity(raw, domain) && echoes.every(field => isDomain(field.value, domain))
+				? domain
+				: null;
+	}
 	if (bg) {
 		const repeated = identity.match(/^(\S+) \((\S+)\)$/);
 		if (repeated && repeated.slice(1).every(name => isDomain(name, domain)))
@@ -98,7 +167,31 @@ export function registryWhoisBlock(domain: string, server: string, block: WhoisB
 		'Expires Date',
 	])
 		delete result[key];
-	if (pt) {
+	if (ee) {
+		const date = (label: string) =>
+			isoDate(value(label, 'domain').replace(/\s+([+-]\d{2}:?\d{2})$/, '$1'));
+		result['Created Date'] = date('registered');
+		result['Updated Date'] = date('changed');
+		result['Expiry Date'] = date('expire');
+		result.Registrar = value('name', 'registrar');
+		result['Registrant Name'] = value('name', 'registrant');
+		result['Registrant Country'] = value('country', 'registrant');
+		result['Domain Status'] = fields
+			.filter(field => field.section === 'domain' && field.label === 'status')
+			.map(field => field.value);
+		result['Name Server'] = fields
+			.filter(field => field.section === 'name servers' && field.label === 'nserver')
+			.map(field => field.value);
+	} else if (cl) {
+		result['Created Date'] = clDate(value('creation date'));
+		result['Expiry Date'] = clDate(value('expiration date'));
+		result.Registrar = value('registrar name');
+		result['Registrant Name'] = value('registrant name');
+		result['Registrant Organization'] = value('registrant organisation');
+		result['Name Server'] = fields
+			.filter(field => field.label === 'name server')
+			.map(field => field.value);
+	} else if (pt) {
 		result['Created Date'] = dayFirst(value('creation date'), '/');
 		result['Expiry Date'] = dayFirst(value('expiration date'), '/');
 	} else if (jisc) {

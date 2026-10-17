@@ -76,7 +76,10 @@ const fixture = net.createServer(socket => {
 			socket.end('Query limit exceeded\n');
 		} else if (host === 'whois.iana.org' && query === 'fr') {
 			socket.end('domain: FR\nwhois:    \n\nstatus: ACTIVE\n');
-		} else if (host === 'whois.iana.org' && ['pt', 'il', 'lv', 'pe', 'au', 'bg'].includes(query)) {
+		} else if (
+			host === 'whois.iana.org' &&
+			['pt', 'il', 'lv', 'pe', 'au', 'bg', 'ee', 'cl', 'ch'].includes(query)
+		) {
 			const hosts = {
 				pt: 'whois.dns.pt',
 				il: 'whois.isoc.org.il',
@@ -84,6 +87,9 @@ const fixture = net.createServer(socket => {
 				pe: 'kero.yachay.pe',
 				au: 'whois.auda.org.au',
 				bg: 'whois.register.bg',
+				ee: 'whois.tld.ee',
+				cl: 'whois.nic.cl',
+				ch: 'whois.nic.ch',
 			};
 			socket.end(`domain: ${query.toUpperCase()}\nwhois: ${hosts[query]}\n`);
 		} else if (host === 'whois.iana.org') {
@@ -94,8 +100,14 @@ const fixture = net.createServer(socket => {
 			socket.end('No useful data, please try again later.\n');
 		} else if (query.startsWith('whois-rate')) {
 			socket.end('Query limit exceeded\n');
+		} else if (host === 'whois.nic.ch' && query.startsWith('denied')) {
+			socket.end(
+				'Requests of this client are not permitted. Please use https://www.nic.ch/whois/ for queries.\n',
+			);
 		} else if (query.startsWith('denied')) {
 			socket.end('Access denied\n');
+		} else if (host === 'whois.nic.cl' && query.startsWith('missing')) {
+			socket.end(`%% NIC Chile\n\n${query}: no entries found.\n`);
 		} else if (query.startsWith('missing')) {
 			socket.end(`No match for "${query.toUpperCase()}".\n`);
 		} else if (
@@ -107,6 +119,8 @@ const fixture = net.createServer(socket => {
 				'kero.yachay.pe',
 				'whois.auda.org.au',
 				'whois.register.bg',
+				'whois.tld.ee',
+				'whois.nic.cl',
 			].includes(host)
 		) {
 			const formats = {
@@ -117,11 +131,16 @@ const fixture = net.createServer(socket => {
 				'kero.yachay.pe': ['pe', 'example.com.pe'],
 				'whois.auda.org.au': ['au', 'example.com.au'],
 				'whois.register.bg': ['bg', 'example.bg'],
+				'whois.tld.ee': ['ee', 'example.ee'],
+				'whois.nic.cl': ['cl', 'example.cl'],
 			};
 			const [name, domain] = formats[host];
-			socket.end(
-				readFileSync(join(__dirname, 'whois', `${name}.txt`), 'utf8').replaceAll(domain, query),
+			let raw = readFileSync(join(__dirname, 'whois', `${name}.txt`), 'utf8').replaceAll(
+				domain,
+				query,
 			);
+			if (query === 'mismatch.cl') raw = raw.replace('?d=mismatch.cl', '?d=other.cl');
+			socket.end(raw);
 		} else {
 			socket.end(
 				`Domain Name: ${query.toUpperCase()}\nRegistrar: Fixture WHOIS Registrar\nRegistrar IANA ID: 456\nCreation Date: 2001-02-03T00:00:00Z\nRegistry Expiry Date: 2031-02-03T00:00:00Z\nName Server: NS2.EXAMPLE.ORG\nDNSSEC: unsigned\n${host === 'whois.registry.example' ? 'Registrar WHOIS Server: whois.registrar.example\n' : ''}`,

@@ -1,0 +1,12 @@
+Registrant name: Example Registrant
+Registrant organisation: Example Organisation
+Registrar name: Example Registrar
+Registrar URL: https://registrar.example
+Creation date: 2008-05-15 21:37:12 CLST
+Expiration date: 2027-06-11 18:33:00 CLST
+Name server: ns1.example.cl
+Name server: ns2.example.cl
+
+%%
+%% See https://www.nic.cl/registry/Whois.do?d=example.cl
+%%
