@@ -180,8 +180,16 @@ export class RegistrationProvider {
 					const raw = await new Promise<string>((resolve, reject) => {
 						const chunks: Buffer[] = [];
 						let size = 0;
-						const socket = connect({ host, port: 43, family: 4, signal: timeout }, () =>
-							socket.write(`${query}\r\n`),
+						// Try both address families for this host within the same upstream deadline.
+						const socket = connect(
+							{
+								host,
+								port: 43,
+								autoSelectFamily: true,
+								autoSelectFamilyAttemptTimeout: 250,
+								signal: timeout,
+							},
+							() => socket.write(`${query}\r\n`),
 						);
 						socket.on('data', (chunk: Buffer) => {
 							size += chunk.byteLength;

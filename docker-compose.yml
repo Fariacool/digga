@@ -3,6 +3,8 @@ services:
     image: ${IMAGE_NAME:-ghcr.io/fariacool/digga:latest}
     ports:
       - '${HOST_BIND_ADDRESS:-0.0.0.0}:${HOST_PORT:-3000}:3000'
+    networks:
+      - dualstack
     env_file:
       - .env
     environment:
@@ -31,3 +33,8 @@ services:
         max-file: '${LOG_MAX_FILE:-3}'
     restart: '${RESTART_POLICY:-unless-stopped}'
     stop_grace_period: 15s
+
+networks:
+  dualstack:
+    driver: bridge
+    enable_ipv6: true

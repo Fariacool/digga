@@ -205,7 +205,7 @@ provide `SITE_URL` in that command's environment when using it.
 
 ### Run with Docker Compose
 
-Install Docker Engine and Docker Compose v2. Place `docker-compose.yml`,
+Install Docker Engine 27+ and Docker Compose v2. Place `docker-compose.yml`,
 `.env.example`, and the executable `compose` script together on your server
 (or clone this repository), then run:
 
@@ -226,6 +226,19 @@ The Compose stack sets `NODE_ENV` and `ENVIRONMENT` to `production`, uses the
 public `/api/auth` status endpoint for its healthcheck, rotates logs, and
 restarts unless stopped. Core lookups do not require a database or persistent
 volume. BigQuery storage remains optional and uses runtime credentials.
+
+The app uses a dedicated `dualstack` bridge with `enable_ipv6: true`; IPv4
+remains enabled. Docker Engine 27+ can allocate the IPv6 subnet automatically.
+WHOIS connections try both address families for the same upstream within the
+existing 5-second deadline. No Dockerfile change is needed. See
+[IPv6 prerequisites and verification](./docs/whois-upstreams.md#ipv6-container-networking).
+
+When upgrading an older IPv4-only stack, copy the updated `docker-compose.yml`
+as well as pulling the new image. The next `./compose upgrade` creates
+`<project>_dualstack` and recreates the app on that network; restarting the old
+container alone does not apply the change. Host IPv6 connectivity, forwarding
+and Docker firewall/NAT support must also work. The Compose file does not edit
+host configuration or enable host forwarding itself.
 
 ```bash
 ./compose validate      # Check configuration without printing environment values

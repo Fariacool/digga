@@ -53,6 +53,64 @@ succeeded locally and returned HTTP 403 from the deployment host, where the
 same domain's WHOIS query succeeded. These samples establish neither permanent
 availability nor the cause of historical rate limits.
 
+## IPv6 container networking
+
+The Compose app attaches to the `dualstack` user-defined bridge. IPv4 stays
+enabled and `enable_ipv6: true` adds IPv6. On Docker Engine 27+, Docker allocates
+an IPv6 subnet from its pools, or a unique local `/64` when no IPv6 pool is
+configured. No fixed subnet or default-bridge `daemon.json` change is required.
+See [Docker IPv6 networking](https://docs.docker.com/engine/daemon/ipv6/) and
+the [Engine 27 networking changes](https://docs.docker.com/engine/release-notes/27/).
+
+WHOIS TCP connections use Node's `autoSelectFamily` with a 250 ms connection
+attempt budget before trying the next address. All addresses belong to the
+same upstream hostname and share the existing 5-second upstream deadline and
+scheduler permit. This only falls back when establishing the connection; it
+does not retry a connected server's response, bypass cooldowns, or solve slow
+reads. IPv4-only hosts remain supported. See
+[Node net connection options](https://nodejs.org/api/net.html#socketconnectoptions-connectlistener).
+
+IPv6 Internet access also needs a working host IPv6 route, forwarding and
+Docker-managed firewall/NAT rules. Enabling a Compose network alone cannot
+guarantee these prerequisites. Docker's iptables backend normally manages
+forwarding; its nftables backend requires forwarding to be enabled separately.
+See [Docker packet filtering](https://docs.docker.com/engine/network/packet-filtering-firewalls/).
+This repository does not change host sysctls, firewall rules or daemon settings.
+Creating the network can cause Docker itself to enable forwarding and install
+firewall rules; review those host effects before deploying.
+
+On 2026-10-17 the deployment host reached `whois.dns.pt:43` over IPv6 in less
+than one second, while its IPv4 connection timed out. The existing container's
+IPv6 attempt returned `ENETUNREACH` and its IPv4 attempt also timed out. The
+running network had `EnableIPv6=false`; host IPv6 forwarding was `0`. These
+were read-only checks. Repository changes have not been applied to that server.
+
+For an older stack, copy the updated Compose file when deploying the new image.
+The separate `<project>_dualstack` network avoids trying to change an existing
+IPv4-only network in place. After a future deployment, these read-only checks
+show network addresses and try the actual WHOIS transport without credentials:
+
+```bash
+docker network inspect "${COMPOSE_PROJECT_NAME:-digga}_dualstack" \
+  --format '{{.EnableIPv6}} {{json .IPAM.Config}}'
+docker compose exec -T app node -e '
+const net = require("node:net");
+const started = Date.now();
+const socket = net.connect({
+  host: "whois.dns.pt", port: 43, autoSelectFamily: true,
+  autoSelectFamilyAttemptTimeout: 250, signal: AbortSignal.timeout(5000)
+}, () => {
+  console.log({family: socket.remoteFamily, elapsedMs: Date.now() - started});
+  socket.destroy();
+});
+socket.on("error", error => { console.error(error.code); process.exitCode = 1; });
+'
+```
+
+Connection success alone does not verify parsed registration data; follow it
+with one fresh authenticated `/api/whois` request. An existing cache hit is not
+evidence that the new network can reach the upstream.
+
 ## Verification
 
 `pnpm test` includes minimized raw-response regression fixtures.
